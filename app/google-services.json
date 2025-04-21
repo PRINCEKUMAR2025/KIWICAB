@@ -1,0 +1,30 @@
+{
+  "project_info": {
+    "project_number": "892173482623",
+    "firebase_url": "https://kiwicab-ad16e-default-rtdb.firebaseio.com",
+    "project_id": "kiwicab-ad16e",
+    "storage_bucket": "kiwicab-ad16e.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:892173482623:android:3854fc2b226ecca9a49d4a",
+        "android_client_info": {
+          "package_name": "com.example.kiwicab"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDJt37MOY8QSYHTQnBtMJzA6t3itqKeJbE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
