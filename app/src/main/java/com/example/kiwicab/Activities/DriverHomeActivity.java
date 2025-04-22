@@ -351,7 +351,7 @@ public class DriverHomeActivity extends AppCompatActivity implements OnMapReadyC
                             float distanceInKm = results[0] / 1000;
 
                             // Only show requests within 5km
-                            if (distanceInKm <= 25) {
+                            if (distanceInKm <= 10) {
                                 // Show ride request
                                 showRideRequest(ride);
                                 break;

@@ -25,6 +25,9 @@ import com.google.firebase.database.DataSnapshot;
 import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
+import com.google.firebase.database.MutableData;
+import com.google.firebase.database.ServerValue;
+import com.google.firebase.database.Transaction;
 import com.google.firebase.database.ValueEventListener;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.stripe.android.PaymentConfiguration;
@@ -226,16 +229,130 @@ public class PaymentActivity extends AppCompatActivity {
         );
     }
 
-    private void onPaymentResult(PaymentSheetResult paymentSheetResult) {
-        if (paymentSheetResult instanceof PaymentSheetResult.Canceled){
-            Toast.makeText(this, "Payment cancelled", Toast.LENGTH_SHORT).show();
-        }
-        if (paymentSheetResult instanceof PaymentSheetResult.Failed){
-            Toast.makeText(this, ((PaymentSheetResult.Failed)paymentSheetResult).getError().getMessage(),Toast.LENGTH_SHORT).show();
-        }
-        if (paymentSheetResult instanceof PaymentSheetResult.Completed){
-            Toast.makeText(this, "Payment Success", Toast.LENGTH_SHORT).show();
+    private void creditDriverBalance(String rideId, double amount) {
+        // First, get the driver ID from the ride
+        DatabaseReference rideRef = FirebaseDatabase.getInstance().getReference()
+                .child("rides").child(rideId);
+
+        rideRef.addListenerForSingleValueEvent(new ValueEventListener() {
+            @Override
+            public void onDataChange(@NonNull DataSnapshot snapshot) {
+                if (snapshot.exists()) {
+                    String driverId = snapshot.child("driverId").getValue(String.class);
+
+                    if (driverId != null) {
+                        // Reference to driver's balance
+                        DatabaseReference driverBalanceRef = FirebaseDatabase.getInstance().getReference()
+                                .child("users").child("drivers").child(driverId).child("balance");
+
+                        // Use a transaction to safely update the balance
+                        driverBalanceRef.runTransaction(new Transaction.Handler() {
+                            @NonNull
+                            @Override
+                            public Transaction.Result doTransaction(@NonNull MutableData mutableData) {
+                                Double currentBalance = mutableData.getValue(Double.class);
+                                if (currentBalance == null) {
+                                    // If no balance exists yet, initialize it
+                                    mutableData.setValue(amount);
+                                } else {
+                                    // Add the payment amount to existing balance
+                                    mutableData.setValue(currentBalance + amount);
+                                }
+                                return Transaction.success(mutableData);
+                            }
+
+                            @Override
+                            public void onComplete(DatabaseError databaseError, boolean committed, DataSnapshot dataSnapshot) {
+                                if (committed) {
+                                    // Record the transaction in payment history
+                                    recordPaymentTransaction(rideId, driverId, amount);
+
+                                    // Update ride status to paid
+                                    updateRidePaymentStatus(rideId);
+
+                                    // Show success message with updated balance
+                                    Double newBalance = dataSnapshot.getValue(Double.class);
+                                    Toast.makeText(PaymentActivity.this,
+                                            "Payment of ₹" + amount + " credited to driver. New balance: ₹" + newBalance,
+                                            Toast.LENGTH_LONG).show();
+
+                                    // Finish activity and return to previous screen
+                                    finish();
+                                } else {
+                                    Toast.makeText(PaymentActivity.this,
+                                            "Failed to update driver balance: " + databaseError.getMessage(),
+                                            Toast.LENGTH_SHORT).show();
+                                }
+                            }
+                        });
+                    } else {
+                        Toast.makeText(PaymentActivity.this, "Driver ID not found", Toast.LENGTH_SHORT).show();
+                    }
+                } else {
+                    Toast.makeText(PaymentActivity.this, "Ride not found", Toast.LENGTH_SHORT).show();
+                }
+            }
+
+            @Override
+            public void onCancelled(@NonNull DatabaseError error) {
+                Toast.makeText(PaymentActivity.this, "Database error: " + error.getMessage(), Toast.LENGTH_SHORT).show();
+            }
+        });
+    }
+
+    private void recordPaymentTransaction(String rideId, String driverId, double amount) {
+        DatabaseReference paymentsRef = FirebaseDatabase.getInstance().getReference().child("payments");
+        String paymentId = paymentsRef.push().getKey();
+
+        if (paymentId != null) {
+            Map<String, Object> paymentData = new HashMap<>();
+            paymentData.put("rideId", rideId);
+            paymentData.put("driverId", driverId);
+            paymentData.put("customerId", auth.getCurrentUser().getUid());
+            paymentData.put("amount", amount);
+            paymentData.put("method", "Stripe");
+            paymentData.put("status", "completed");
+            paymentData.put("timestamp", ServerValue.TIMESTAMP);
+            paymentData.put("stripeCustomerId", customerID);
+
+            paymentsRef.child(paymentId).setValue(paymentData)
+                    .addOnSuccessListener(aVoid -> Log.d("Payment", "Payment transaction recorded successfully"))
+                    .addOnFailureListener(e -> Log.e("Payment", "Failed to record payment transaction", e));
         }
     }
+
+    private void updateRidePaymentStatus(String rideId) {
+        DatabaseReference rideRef = FirebaseDatabase.getInstance().getReference()
+                .child("rides").child(rideId);
+
+        Map<String, Object> updates = new HashMap<>();
+        updates.put("isPaid", true);
+
+        rideRef.updateChildren(updates)
+                .addOnSuccessListener(aVoid -> Log.d("Payment", "Ride payment status updated successfully"))
+                .addOnFailureListener(e -> Log.e("Payment", "Failed to update ride payment status", e));
+    }
+
+
+
+    private void onPaymentResult(PaymentSheetResult paymentSheetResult) {
+        if (paymentSheetResult instanceof PaymentSheetResult.Canceled) {
+            Toast.makeText(this, "Payment cancelled", Toast.LENGTH_SHORT).show();
+        }
+        else if (paymentSheetResult instanceof PaymentSheetResult.Failed) {
+            Toast.makeText(this, ((PaymentSheetResult.Failed)paymentSheetResult).getError().getMessage(), Toast.LENGTH_SHORT).show();
+        }
+        else if (paymentSheetResult instanceof PaymentSheetResult.Completed) {
+            Toast.makeText(this, "Payment Success", Toast.LENGTH_SHORT).show();
+
+            // Get ride ID from intent
+            String rideId = getIntent().getStringExtra("rideId");
+            double amount = getIntent().getDoubleExtra("amountToPay", 0.0);
+
+            // Credit the payment to driver's balance
+            creditDriverBalance(rideId, amount);
+        }
+    }
+
 
 }
