@@ -351,7 +351,7 @@ public class DriverHomeActivity extends AppCompatActivity implements OnMapReadyC
                             float distanceInKm = results[0] / 1000;
 
                             // Only show requests within 5km
-                            if (distanceInKm <= 20) {
+                            if (distanceInKm <= 25) {
                                 // Show ride request
                                 showRideRequest(ride);
                                 break;
@@ -479,8 +479,6 @@ public class DriverHomeActivity extends AppCompatActivity implements OnMapReadyC
             listenForRideUpdates();
         }
     }
-
-
 
     private void startRide() {
         if (currentRideId != null) {
@@ -755,7 +753,8 @@ public class DriverHomeActivity extends AppCompatActivity implements OnMapReadyC
             // Open ride history activity
             startActivity(new Intent(DriverHomeActivity.this, RideHistoryActivity.class));
             return true;
-        } else if (id==R.id.action_earnings) {
+        }else if (id == R.id.action_earnings) {
+            // Open ride history activity
             startActivity(new Intent(DriverHomeActivity.this, DriverEarningsActivity.class));
             return true;
         }
