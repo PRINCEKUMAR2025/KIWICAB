@@ -10,6 +10,8 @@ public class Ride {
     private double fare;
     private long timestamp;
     private double distance;
+    private Boolean isPaid;
+    private Boolean isRated;
 
     private static final double BASE_FARE = 50.0; // Base fare in ₹
     private static final double PRICE_PER_KM = 10.0; // ₹ per kilometer
@@ -125,5 +127,21 @@ public class Ride {
         this.distance = distance;
         // Recalculate fare when distance changes
         recalculateFare();
+    }
+
+    public Boolean getIsPaid() {
+        return isPaid;
+    }
+
+    public void setIsPaid(Boolean isPaid) {
+        this.isPaid = isPaid;
+    }
+
+    public Boolean getIsRated() {
+        return isRated;
+    }
+
+    public void setIsRated(Boolean isRated) {
+        this.isRated = isRated;
     }
 }

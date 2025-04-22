@@ -10,6 +10,7 @@ import androidx.core.content.ContextCompat;
 
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.location.Address;
 import android.location.Geocoder;
@@ -30,6 +31,7 @@ import android.widget.EditText;
 import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
+import android.widget.RadioGroup;
 import android.widget.RatingBar;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -65,11 +67,14 @@ import com.google.firebase.database.DataSnapshot;
 import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
+import com.google.firebase.database.ServerValue;
 import com.google.firebase.database.ValueEventListener;
 
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 public class CustomerHomeActivity extends AppCompatActivity implements OnMapReadyCallback {
 
@@ -406,8 +411,21 @@ public class CustomerHomeActivity extends AppCompatActivity implements OnMapRead
                     onlineDriversRef.child(ride.getDriverId()).removeEventListener(driverLocationListener);
                     driverLocationListener = null;
                 }
-                // Show rating dialog
-                showRatingDialog(ride.getDriverId());
+//                showPaymentDialog(currentRideId, ride.getFare());
+                SharedPreferences prefs = getSharedPreferences("ride_prefs", MODE_PRIVATE);
+                boolean isPaid = prefs.getBoolean("paid_" + ride.getId(), false);
+                boolean isRated = prefs.getBoolean("rated_" + ride.getId(), false);
+
+                // Also check Firebase for payment status
+                if (!isPaid && (ride.getIsPaid() == null || !ride.getIsPaid())) {
+                    showPaymentDialog(currentRideId, ride.getFare());
+                }
+
+                // Check if rating is already done
+                if (!isRated && (ride.getIsRated() == null || !ride.getIsRated())) {
+                    showRatingDialog(ride.getDriverId());
+                }
+
                 resetRideUI();
                 break;
             case "cancelled":
@@ -625,7 +643,111 @@ public class CustomerHomeActivity extends AppCompatActivity implements OnMapRead
         });
     }
 
+    private void markRatingComplete(String rideId) {
+        // Store in Firebase that this ride has been rated
+        Map<String, Object> updates = new HashMap<>();
+        updates.put("isRated", true);
+        ridesRef.child(rideId).updateChildren(updates);
+
+        // Also store locally
+        SharedPreferences prefs = getSharedPreferences("ride_prefs", MODE_PRIVATE);
+        SharedPreferences.Editor editor = prefs.edit();
+        editor.putBoolean("rated_" + rideId, true);
+        editor.apply();
+    }
+
+    private void markPaymentComplete(String rideId) {
+        // Store in Firebase that payment is complete
+        Map<String, Object> updates = new HashMap<>();
+        updates.put("isPaid", true);
+        ridesRef.child(rideId).updateChildren(updates);
+
+        // Also store locally
+        SharedPreferences prefs = getSharedPreferences("ride_prefs", MODE_PRIVATE);
+        SharedPreferences.Editor editor = prefs.edit();
+        editor.putBoolean("paid_" + rideId, true);
+        editor.apply();
+    }
+
+
+    private void showPaymentDialog(String rideId, double fareAmount) {
+        // Check if already paid
+        SharedPreferences prefs = getSharedPreferences("ride_prefs", MODE_PRIVATE);
+        if (prefs.getBoolean("paid_" + rideId, false)) {
+            return; // Skip showing dialog if already paid
+        }
+        View dialogView = getLayoutInflater().inflate(R.layout.dialog_payment, null);
+        final EditText amountEditText = dialogView.findViewById(R.id.paymentAmountEditText);
+        final RadioGroup paymentMethodGroup = dialogView.findViewById(R.id.paymentMethodGroup);
+
+        // Set default fare amount
+        amountEditText.setText(String.format("%.2f", fareAmount));
+
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("Confirm Payment")
+                .setView(dialogView)
+                .setPositiveButton("Pay", null) // Set to null so we can override later
+                .setNegativeButton("Cancel", null);
+
+        AlertDialog dialog = builder.create();
+        dialog.show();
+
+        // Override the positive button to prevent auto-dismiss
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
+            String amountStr = amountEditText.getText().toString().trim();
+
+            if (TextUtils.isEmpty(amountStr)) {
+                Toast.makeText(this, "Please enter an amount", Toast.LENGTH_SHORT).show();
+                return;
+            }
+
+            double amount;
+            try {
+                amount = Double.parseDouble(amountStr);
+            } catch (NumberFormatException e) {
+                Toast.makeText(this, "Invalid amount", Toast.LENGTH_SHORT).show();
+                return;
+            }
+
+            int selectedMethodId = paymentMethodGroup.getCheckedRadioButtonId();
+            if (selectedMethodId == -1) {
+                Toast.makeText(this, "Select a payment method", Toast.LENGTH_SHORT).show();
+                return;
+            }
+
+            if (selectedMethodId == R.id.radioCash) {
+                Map<String, Object> paymentData = new HashMap<>();
+                paymentData.put("amountPaid", amount);
+                paymentData.put("method", "Cash");
+                paymentData.put("timestamp", ServerValue.TIMESTAMP);
+
+                FirebaseDatabase.getInstance().getReference()
+                        .child("payments")
+                        .child(rideId)
+                        .setValue(paymentData);
+
+                Toast.makeText(this, "Cash payment recorded", Toast.LENGTH_SHORT).show();
+                markPaymentComplete(rideId);
+                dialog.dismiss();
+
+            } else if (selectedMethodId == R.id.radioCard) {
+                // Navigate to PaymentActivity for Stripe payment
+                Intent intent = new Intent(this, PaymentActivity.class);
+                intent.putExtra("rideId", rideId);
+                intent.putExtra("amountToPay", amount);
+                startActivity(intent);
+                dialog.dismiss();
+            }
+        });
+    }
+
+
+
     private void showRatingDialog(final String driverId) {
+        SharedPreferences prefs = getSharedPreferences("ride_prefs", MODE_PRIVATE);
+        if (prefs.getBoolean("rated_" + currentRideId, false)) {
+            return; // Skip showing dialog if already rated
+        }
         View dialogView = getLayoutInflater().inflate(R.layout.dialog_rating, null);
         final RatingBar ratingBar = dialogView.findViewById(R.id.ratingBar);
         final EditText feedbackEditText = dialogView.findViewById(R.id.feedbackEditText);
@@ -650,6 +772,7 @@ public class CustomerHomeActivity extends AppCompatActivity implements OnMapRead
                                     float sum = 0;
                                     int count = 0;
 
+                                    markRatingComplete(currentRideId);
                                     for (DataSnapshot ratingSnapshot : snapshot.getChildren()) {
                                         Float ratingValue = ratingSnapshot.getValue(Float.class);
                                         if (ratingValue != null) {
