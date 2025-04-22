@@ -117,6 +117,9 @@ public class CustomerHomeActivity extends AppCompatActivity implements OnMapRead
     private String destinationAddress;
     private Marker driverMarker;
     private ValueEventListener driverLocationListener;
+    private ImageButton toggleCardBtn;
+    private LinearLayout cardContent;
+    private boolean isCardExpanded = true;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -146,6 +149,9 @@ public class CustomerHomeActivity extends AppCompatActivity implements OnMapRead
         destinationEditText = findViewById(R.id.destinationEditText);
         statusTextView = findViewById(R.id.statusTextView);
         rideDetailsCard = findViewById(R.id.rideDetailsCard);
+
+        toggleCardBtn = findViewById(R.id.toggleCardBtn);
+        cardContent = findViewById(R.id.cardContent);
 
         // Initially hide ride details card
         rideDetailsCard.setVisibility(View.GONE);
@@ -177,8 +183,42 @@ public class CustomerHomeActivity extends AppCompatActivity implements OnMapRead
             }
         });
 
+        // Set up the toggle button click listener
+        toggleCardBtn.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                toggleCardExpansion();
+            }
+        });
+
+        // Restore the card state if we have it saved
+        SharedPreferences prefs = getSharedPreferences("card_prefs", MODE_PRIVATE);
+        isCardExpanded = prefs.getBoolean("is_card_expanded", true);
+        updateCardState();
+
         // Check if user has an active ride
         checkForActiveRide();
+    }
+
+    private void toggleCardExpansion() {
+        isCardExpanded = !isCardExpanded;
+        updateCardState();
+
+        // Save the state
+        SharedPreferences prefs = getSharedPreferences("card_prefs", MODE_PRIVATE);
+        SharedPreferences.Editor editor = prefs.edit();
+        editor.putBoolean("is_card_expanded", isCardExpanded);
+        editor.apply();
+    }
+
+    private void updateCardState() {
+        if (isCardExpanded) {
+            cardContent.setVisibility(View.VISIBLE);
+            toggleCardBtn.setImageResource(R.drawable.ic_arrow_up);
+        } else {
+            cardContent.setVisibility(View.GONE);
+            toggleCardBtn.setImageResource(R.drawable.ic_arrow_down);
+        }
     }
 
     @Override
@@ -817,32 +857,6 @@ public class CustomerHomeActivity extends AppCompatActivity implements OnMapRead
     }
 
 
-    // Helper method to animate marker movement (smooth transition)
-    private void animateMarkerToPosition(final Marker marker, final LatLng targetPosition) {
-        final LatLng startPosition = marker.getPosition();
-        final Handler handler = new Handler();
-        final long start = SystemClock.uptimeMillis();
-        final long duration = 500; // Animation duration in ms
-        final Interpolator interpolator = new LinearInterpolator();
-
-        handler.post(new Runnable() {
-            @Override
-            public void run() {
-                long elapsed = SystemClock.uptimeMillis() - start;
-                float t = interpolator.getInterpolation((float) elapsed / duration);
-
-                double lng = t * targetPosition.longitude + (1 - t) * startPosition.longitude;
-                double lat = t * targetPosition.latitude + (1 - t) * startPosition.latitude;
-
-                marker.setPosition(new LatLng(lat, lng));
-
-                // Repeat until animation is complete
-                if (t < 1.0) {
-                    handler.postDelayed(this, 16); // 60fps
-                }
-            }
-        });
-    }
 
     private void markRatingComplete(String rideId) {
         // Store in Firebase that this ride has been rated
@@ -938,7 +952,7 @@ public class CustomerHomeActivity extends AppCompatActivity implements OnMapRead
                             if (task.isSuccessful()) {
                                 // Only mark payment complete and dismiss dialog if Firebase write succeeds
                                 markPaymentComplete(rideId);
-                                Toast.makeText(this, "Cash payment recorded", Toast.LENGTH_SHORT).show();
+                                Toast.makeText(this, "Give Cash To Driver", Toast.LENGTH_SHORT).show();
 
                                 // Dismiss both dialogs
                                 progressDialog.dismiss();

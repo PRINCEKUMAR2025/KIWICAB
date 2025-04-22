@@ -67,142 +67,172 @@
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:padding="16dp">
+            android:orientation="vertical">
 
-            <TextView
-                android:id="@+id/statusTextView"
+            <RelativeLayout
+                android:id="@+id/cardHeader"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="Looking for a driver..."
-                android:textSize="18sp"
-                android:textStyle="bold" />
+                android:background="@color/colorPrimary"
+                android:padding="8dp">
 
-            <LinearLayout
-                android:id="@+id/driverDetailsLayout"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
-                android:orientation="horizontal"
-                android:visibility="gone">
-
-                <ImageView
-                    android:id="@+id/driverImageView"
-                    android:layout_width="60dp"
-                    android:layout_height="60dp"
-                    android:src="@drawable/default_profile" />
-
-                <LinearLayout
-                    android:layout_width="0dp"
+                <TextView
+                    android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginStart="16dp"
-                    android:layout_weight="1"
-                    android:orientation="vertical">
-
-                    <TextView
-                        android:id="@+id/driverNameTextView"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:text="Driver Name"
-                        android:textSize="16sp"
-                        android:textStyle="bold" />
-
-                    <TextView
-                        android:id="@+id/vehicleDetailsTextView"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:text="Vehicle Details"
-                        android:textSize="14sp" />
-
-                    <RatingBar
-                        android:id="@+id/driverRatingBar"
-                        style="?android:attr/ratingBarStyleSmall"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="4dp"
-                        android:isIndicator="true"
-                        android:numStars="5"
-                        android:rating="4.5" />
-                </LinearLayout>
+                    android:layout_centerVertical="true"
+                    android:text="Ride Details"
+                    android:textColor="@android:color/white"
+                    android:textStyle="bold" />
 
                 <ImageButton
-                    android:id="@+id/callDriverBtn"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
+                    android:id="@+id/toggleCardBtn"
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:layout_alignParentEnd="true"
+                    android:layout_centerVertical="true"
                     android:background="?attr/selectableItemBackgroundBorderless"
-                    android:padding="8dp"
-                    android:src="@drawable/ic_call" />
-            </LinearLayout>
+                    android:src="@drawable/ic_arrow_up"
+                    app:tint="@color/white" />
+            </RelativeLayout>
 
-            <View
-                android:layout_width="match_parent"
-                android:layout_height="1dp"
-                android:layout_marginTop="16dp"
-                android:layout_marginBottom="16dp"
-                android:background="#E0E0E0" />
-
-            <!-- ETA Section -->
-            <TextView
-                android:id="@+id/etaTextView"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:text="Driver ETA: Calculating..."
-                android:textSize="16sp"
-                android:textStyle="bold"
-                android:visibility="gone" />
-
-            <!-- Distance Section -->
             <LinearLayout
+                android:id="@+id/cardContent"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="horizontal">
+                android:orientation="vertical"
+                android:padding="16dp">
 
                 <TextView
-                    android:layout_width="wrap_content"
+                    android:id="@+id/statusTextView"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="Distance: "
-                    android:textSize="16sp" />
-
-                <TextView
-                    android:id="@+id/estimatedDistance"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="3.2 km"
-                    android:textSize="16sp"
+                    android:text="Looking for a driver..."
+                    android:textSize="18sp"
                     android:textStyle="bold" />
-            </LinearLayout>
 
-            <!-- Fare Section -->
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:layout_marginTop="8dp">
+                <LinearLayout
+                    android:id="@+id/driverDetailsLayout"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    android:orientation="horizontal"
+                    android:visibility="gone">
+
+                    <ImageView
+                        android:id="@+id/driverImageView"
+                        android:layout_width="60dp"
+                        android:layout_height="60dp"
+                        android:src="@drawable/default_profile" />
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="16dp"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:id="@+id/driverNameTextView"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="Driver Name"
+                            android:textSize="16sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:id="@+id/vehicleDetailsTextView"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="Vehicle Details"
+                            android:textSize="14sp" />
+
+                        <RatingBar
+                            android:id="@+id/driverRatingBar"
+                            style="?android:attr/ratingBarStyleSmall"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="4dp"
+                            android:isIndicator="true"
+                            android:numStars="5"
+                            android:rating="4.5" />
+                    </LinearLayout>
+
+                    <ImageButton
+                        android:id="@+id/callDriverBtn"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:background="?attr/selectableItemBackgroundBorderless"
+                        android:padding="8dp"
+                        android:src="@drawable/ic_call" />
+                </LinearLayout>
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:layout_marginTop="16dp"
+                    android:layout_marginBottom="16dp"
+                    android:background="#E0E0E0" />
 
                 <TextView
-                    android:layout_width="wrap_content"
+                    android:id="@+id/etaTextView"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="Estimated fare: "
-                    android:textSize="16sp" />
-
-                <TextView
-                    android:id="@+id/fareTextView"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="₹150"
+                    android:layout_marginTop="8dp"
+                    android:text="Driver ETA: Calculating..."
                     android:textSize="16sp"
-                    android:textStyle="bold" />
-            </LinearLayout>
+                    android:textStyle="bold"
+                    android:visibility="gone" />
 
-            <Button
-                android:id="@+id/cancelRideBtn"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
-                android:background="@color/black"
-                android:text="Cancel Ride"
-                android:textColor="@android:color/white" />
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Distance: "
+                        android:textSize="16sp" />
+
+                    <TextView
+                        android:id="@+id/estimatedDistance"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="3.2 km"
+                        android:textSize="16sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:layout_marginTop="8dp">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Estimated fare: "
+                        android:textSize="16sp" />
+
+                    <TextView
+                        android:id="@+id/fareTextView"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="₹150"
+                        android:textSize="16sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
+
+                <Button
+                    android:id="@+id/cancelRideBtn"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    android:background="@color/black"
+                    android:text="Cancel Ride"
+                    android:textColor="@android:color/white" />
+            </LinearLayout>
         </LinearLayout>
     </androidx.cardview.widget.CardView>
 

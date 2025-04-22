@@ -8,8 +8,11 @@ import androidx.cardview.widget.CardView;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
+import android.animation.Animator;
+import android.animation.AnimatorListenerAdapter;
 import android.app.ProgressDialog;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.location.Location;
@@ -22,6 +25,8 @@ import android.view.MenuItem;
 import android.view.View;
 import android.widget.Button;
 import android.widget.CompoundButton;
+import android.widget.ImageButton;
+import android.widget.LinearLayout;
 import android.widget.Switch;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -94,6 +99,11 @@ public class DriverHomeActivity extends AppCompatActivity implements OnMapReadyC
     private Button callCustomerBtn;
     private String customerPhone;
     private ProgressDialog progressDialog;
+    private ImageButton toggleStatusBtn, toggleRideRequestBtn;
+    private LinearLayout statusContent, rideRequestContent;
+    private boolean isStatusExpanded = true;
+    private boolean isRideRequestExpanded = true;
+    private TextView rideFareTextView;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -130,6 +140,11 @@ public class DriverHomeActivity extends AppCompatActivity implements OnMapReadyC
         availabilitySwitch = findViewById(R.id.availabilitySwitch);
         customerPhoneTextView = findViewById(R.id.customerPhoneTextView);
         callCustomerBtn = findViewById(R.id.callCustomerBtn);
+        toggleStatusBtn = findViewById(R.id.toggleStatusBtn);
+        toggleRideRequestBtn = findViewById(R.id.toggleRideRequestBtn);
+        statusContent = findViewById(R.id.statusContent);
+        rideRequestContent = findViewById(R.id.rideRequestContent);
+        rideFareTextView = findViewById(R.id.rideFareTextView);
 
 // Set click listener for call button
         callCustomerBtn.setOnClickListener(new View.OnClickListener() {
@@ -189,9 +204,104 @@ public class DriverHomeActivity extends AppCompatActivity implements OnMapReadyC
             }
         });
 
+        toggleStatusBtn.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                toggleStatusExpansion();
+            }
+        });
+
+        toggleRideRequestBtn.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                toggleRideRequestExpansion();
+            }
+        });
+
+        // Restore the card states if we have them saved
+        SharedPreferences prefs = getSharedPreferences("card_prefs", MODE_PRIVATE);
+        isStatusExpanded = prefs.getBoolean("is_status_expanded", true);
+        isRideRequestExpanded = prefs.getBoolean("is_ride_request_expanded", true);
+
+        // Update card states
+        updateStatusCardState();
+        updateRideRequestCardState();
+
         // Check if driver has an active ride
         checkForActiveRide();
         monitorAcceptedRides();
+    }
+
+    private void toggleStatusExpansion() {
+        isStatusExpanded = !isStatusExpanded;
+        updateStatusCardState();
+
+        // Save the state
+        SharedPreferences prefs = getSharedPreferences("card_prefs", MODE_PRIVATE);
+        SharedPreferences.Editor editor = prefs.edit();
+        editor.putBoolean("is_status_expanded", isStatusExpanded);
+        editor.apply();
+    }
+
+    private void toggleRideRequestExpansion() {
+        isRideRequestExpanded = !isRideRequestExpanded;
+        updateRideRequestCardState();
+
+        // Save the state
+        SharedPreferences prefs = getSharedPreferences("card_prefs", MODE_PRIVATE);
+        SharedPreferences.Editor editor = prefs.edit();
+        editor.putBoolean("is_ride_request_expanded", isRideRequestExpanded);
+        editor.apply();
+    }
+
+    private void updateStatusCardState() {
+        if (isStatusExpanded) {
+            // Expand with animation
+            statusContent.setVisibility(View.VISIBLE);
+            statusContent.setAlpha(0f);
+            statusContent.animate()
+                    .alpha(1f)
+                    .setDuration(300)
+                    .setListener(null);
+            toggleStatusBtn.setImageResource(R.drawable.ic_arrow_up);
+        } else {
+            // Collapse with animation
+            statusContent.animate()
+                    .alpha(0f)
+                    .setDuration(300)
+                    .setListener(new AnimatorListenerAdapter() {
+                        @Override
+                        public void onAnimationEnd(Animator animation) {
+                            statusContent.setVisibility(View.GONE);
+                        }
+                    });
+            toggleStatusBtn.setImageResource(R.drawable.ic_arrow_down);
+        }
+    }
+
+    private void updateRideRequestCardState() {
+        if (isRideRequestExpanded) {
+            // Expand with animation
+            rideRequestContent.setVisibility(View.VISIBLE);
+            rideRequestContent.setAlpha(0f);
+            rideRequestContent.animate()
+                    .alpha(1f)
+                    .setDuration(300)
+                    .setListener(null);
+            toggleRideRequestBtn.setImageResource(R.drawable.ic_arrow_up);
+        } else {
+            // Collapse with animation
+            rideRequestContent.animate()
+                    .alpha(0f)
+                    .setDuration(300)
+                    .setListener(new AnimatorListenerAdapter() {
+                        @Override
+                        public void onAnimationEnd(Animator animation) {
+                            rideRequestContent.setVisibility(View.GONE);
+                        }
+                    });
+            toggleRideRequestBtn.setImageResource(R.drawable.ic_arrow_down);
+        }
     }
 
     @Override
@@ -478,6 +588,9 @@ public class DriverHomeActivity extends AppCompatActivity implements OnMapReadyC
                         customerPhone = customer.getPhone(); // Store phone number for call function
                         pickupAddressTextView.setText(ride.getPickupLocation().getAddress());
                         destinationAddressTextView.setText(ride.getDestinationLocation().getAddress());
+
+                        // Set fare amount
+                        rideFareTextView.setText(String.format("₹%.2f", ride.getFare()));
 
                         // Show pickup and destination on map
                         showRideOnMap(ride);
@@ -862,6 +975,8 @@ public class DriverHomeActivity extends AppCompatActivity implements OnMapReadyC
                     if (snapshot.exists()) {
                         Ride ride = snapshot.getValue(Ride.class);
                         if (ride != null) {
+                            // Update fare display
+                            rideFareTextView.setText(String.format("₹%.2f", ride.getFare()));
                             // Check if ride was cancelled by customer
                             if (ride.getStatus().equals("cancelled")) {
                                 Toast.makeText(DriverHomeActivity.this, "Ride was cancelled by the customer", Toast.LENGTH_LONG).show();
@@ -933,6 +1048,8 @@ public class DriverHomeActivity extends AppCompatActivity implements OnMapReadyC
                                 if (snapshot.exists()) {
                                     Ride ride = snapshot.getValue(Ride.class);
                                     if (ride != null) {
+                                        // Set fare amount
+                                        rideFareTextView.setText(String.format("₹%.2f", ride.getFare()));
                                         // Set UI for active ride
                                         rideRequestCard.setVisibility(View.VISIBLE);
 
