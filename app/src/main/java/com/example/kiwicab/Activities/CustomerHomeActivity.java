@@ -17,6 +17,7 @@ import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
+import android.graphics.Color;
 import android.location.Address;
 import android.location.Geocoder;
 
@@ -66,6 +67,7 @@ import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.LatLngBounds;
 import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
+import com.google.android.gms.maps.model.PolylineOptions;
 import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.OnSuccessListener;
 import com.google.android.gms.tasks.Task;
@@ -79,11 +81,18 @@ import com.google.firebase.database.ServerValue;
 import com.google.firebase.database.Transaction;
 import com.google.firebase.database.ValueEventListener;
 
+import org.json.JSONArray;
+import org.json.JSONObject;
+
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
 
 public class CustomerHomeActivity extends AppCompatActivity implements OnMapReadyCallback {
 
@@ -398,6 +407,166 @@ public class CustomerHomeActivity extends AppCompatActivity implements OnMapRead
         });
     }
 
+    private void drawRouteFromDriverToCustomer(LatLng driverLocation, LatLng customerLocation) {
+        // Build the OSRM API URL
+        String url = "https://router.project-osrm.org/route/v1/driving/" +
+                driverLocation.longitude + "," + driverLocation.latitude + ";" +
+                customerLocation.longitude + "," + customerLocation.latitude +
+                "?overview=full&geometries=polyline";
+
+        // Create OkHttp client for making the request
+        OkHttpClient client = new OkHttpClient();
+        Request request = new Request.Builder()
+                .url(url)
+                .build();
+
+        // Execute the request asynchronously
+        client.newCall(request).enqueue(new okhttp3.Callback() {
+            @Override
+            public void onFailure(okhttp3.Call call, IOException e) {
+                // Handle failure - fall back to straight line
+                runOnUiThread(() -> {
+                    // Draw a simple straight line as fallback
+                    drawStraightLine(driverLocation, customerLocation);
+                    Log.e("RouteDrawing", "Failed to get route: " + e.getMessage());
+                });
+            }
+
+            @Override
+            public void onResponse(okhttp3.Call call, okhttp3.Response response) throws IOException {
+                if (response.isSuccessful()) {
+                    try {
+                        String responseData = response.body().string();
+                        JSONObject jsonObject = new JSONObject(responseData);
+
+                        // Check if the route was found
+                        String status = jsonObject.getString("code");
+                        if ("Ok".equals(status)) {
+                            JSONArray routes = jsonObject.getJSONArray("routes");
+                            if (routes.length() > 0) {
+                                JSONObject route = routes.getJSONObject(0);
+                                String encodedPolyline = route.getString("geometry");
+
+                                // Get additional information
+                                double distance = route.getDouble("distance"); // in meters
+                                double duration = route.getDouble("duration"); // in seconds
+
+                                // Decode the polyline
+                                List<LatLng> decodedPath = decodePoly(encodedPolyline);
+
+                                // Update UI on the main thread
+                                runOnUiThread(() -> {
+                                    // Clear previous polylines
+                                    if (mMap != null) {
+                                        mMap.clear();
+
+                                        // Re-add all markers
+                                        if (pickupMarker != null) {
+                                            pickupMarker = mMap.addMarker(new MarkerOptions()
+                                                    .position(pickupLocation)
+                                                    .title("Pickup Location")
+                                                    .icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_GREEN)));
+                                        }
+
+                                        if (destinationMarker != null) {
+                                            destinationMarker = mMap.addMarker(new MarkerOptions()
+                                                    .position(destinationLocation)
+                                                    .title("Destination")
+                                                    .icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_RED)));
+                                        }
+
+                                        // Add driver marker
+                                        driverMarker = mMap.addMarker(new MarkerOptions()
+                                                .position(driverLocation)
+                                                .title("Your Driver")
+                                                .icon(BitmapDescriptorFactory.fromResource(R.drawable.car_icon)));
+
+                                        // Draw the polyline
+                                        PolylineOptions options = new PolylineOptions()
+                                                .addAll(decodedPath)
+                                                .width(10)
+                                                .color(Color.BLUE)
+                                                .geodesic(true);
+                                        mMap.addPolyline(options);
+
+                                        // Update ETA information
+                                        int minutes = (int)(duration / 60);
+                                        TextView etaTextView = findViewById(R.id.etaTextView);
+                                        if (etaTextView != null) {
+                                            etaTextView.setText("Driver ETA: " + minutes + " min");
+                                            etaTextView.setVisibility(View.VISIBLE);
+                                        }
+                                    }
+                                });
+                            }
+                        } else {
+                            // No route found, fall back to straight line
+                            runOnUiThread(() -> {
+                                drawStraightLine(driverLocation, customerLocation);
+                            });
+                        }
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                        // Fall back to simple route on error
+                        runOnUiThread(() -> {
+                            drawStraightLine(driverLocation, customerLocation);
+                        });
+                    }
+                } else {
+                    // Handle unsuccessful response
+                    runOnUiThread(() -> {
+                        drawStraightLine(driverLocation, customerLocation);
+                    });
+                }
+            }
+        });
+    }
+
+    // Fallback method to draw a straight line
+    private void drawStraightLine(LatLng driverLocation, LatLng customerLocation) {
+        if (mMap != null) {
+            PolylineOptions options = new PolylineOptions()
+                    .add(driverLocation)
+                    .add(customerLocation)
+                    .width(10)
+                    .color(Color.GRAY)
+                    .geodesic(true);
+            mMap.addPolyline(options);
+        }
+    }
+
+    // Method to decode polyline points
+    private List<LatLng> decodePoly(String encoded) {
+        List<LatLng> poly = new ArrayList<>();
+        int index = 0, len = encoded.length();
+        int lat = 0, lng = 0;
+
+        while (index < len) {
+            int b, shift = 0, result = 0;
+            do {
+                b = encoded.charAt(index++) - 63;
+                result |= (b & 0x1f) << shift;
+                shift += 5;
+            } while (b >= 0x20);
+            int dlat = ((result & 1) != 0 ? ~(result >> 1) : (result >> 1));
+            lat += dlat;
+
+            shift = 0;
+            result = 0;
+            do {
+                b = encoded.charAt(index++) - 63;
+                result |= (b & 0x1f) << shift;
+                shift += 5;
+            } while (b >= 0x20);
+            int dlng = ((result & 1) != 0 ? ~(result >> 1) : (result >> 1));
+            lng += dlng;
+
+            LatLng p = new LatLng((lat / 1E5), (lng / 1E5));
+            poly.add(p);
+        }
+        return poly;
+    }
+
     private void updateRideUI(Ride ride) {
         switch (ride.getStatus()) {
             case "requested":
@@ -620,16 +789,9 @@ public class CustomerHomeActivity extends AppCompatActivity implements OnMapRead
                     if (latitude != null && longitude != null) {
                         LatLng driverLatLng = new LatLng(latitude, longitude);
 
-                        // Update or add driver marker
-                        if (driverMarker != null) {
-                            // Animate marker to new position
-                            animateMarkerToPosition(driverMarker, driverLatLng);
-                        } else {
-                            // Create new marker for driver
-                            driverMarker = mMap.addMarker(new MarkerOptions()
-                                    .position(driverLatLng)
-                                    .title("Your Driver")
-                                    .icon(BitmapDescriptorFactory.fromResource(R.drawable.car_icon)));
+                        // Draw route from driver to customer (pickup location)
+                        if (pickupLocation != null) {
+                            drawRouteFromDriverToCustomer(driverLatLng, pickupLocation);
                         }
 
                         // If pickup and destination markers exist, include all in camera view
@@ -653,6 +815,7 @@ public class CustomerHomeActivity extends AppCompatActivity implements OnMapRead
             }
         });
     }
+
 
     // Helper method to animate marker movement (smooth transition)
     private void animateMarkerToPosition(final Marker marker, final LatLng targetPosition) {
