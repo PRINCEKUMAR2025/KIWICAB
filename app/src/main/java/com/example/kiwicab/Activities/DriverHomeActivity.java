@@ -12,6 +12,7 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.location.Location;
+import android.net.Uri;
 import android.os.Bundle;
 import android.os.Looper;
 import android.view.Menu;
@@ -73,6 +74,9 @@ public class DriverHomeActivity extends AppCompatActivity implements OnMapReadyC
     private LatLng driverLocation;
     private boolean isAvailable = false;
     private ValueEventListener rideRequestListener;
+    private TextView customerPhoneTextView;
+    private Button callCustomerBtn;
+    private String customerPhone;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -107,6 +111,16 @@ public class DriverHomeActivity extends AppCompatActivity implements OnMapReadyC
         destinationAddressTextView = findViewById(R.id.destinationAddressTextView);
         rideRequestCard = findViewById(R.id.rideRequestCard);
         availabilitySwitch = findViewById(R.id.availabilitySwitch);
+        customerPhoneTextView = findViewById(R.id.customerPhoneTextView);
+        callCustomerBtn = findViewById(R.id.callCustomerBtn);
+
+// Set click listener for call button
+        callCustomerBtn.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                callCustomer();
+            }
+        });
 
         // Initially hide ride request card and ride control buttons
         rideRequestCard.setVisibility(View.GONE);
@@ -371,6 +385,8 @@ public class DriverHomeActivity extends AppCompatActivity implements OnMapReadyC
 
                         // Set customer details
                         customerNameTextView.setText(customer.getName());
+                        customerPhoneTextView.setText(customer.getPhone());
+                        customerPhone = customer.getPhone(); // Store phone number for call function
                         pickupAddressTextView.setText(ride.getPickupLocation().getAddress());
                         destinationAddressTextView.setText(ride.getDestinationLocation().getAddress());
 
@@ -386,6 +402,7 @@ public class DriverHomeActivity extends AppCompatActivity implements OnMapReadyC
             }
         });
     }
+
 
     private void showRideOnMap(Ride ride) {
         // Clear previous markers
@@ -600,6 +617,25 @@ public class DriverHomeActivity extends AppCompatActivity implements OnMapReadyC
             });
         }
     }
+    private void callCustomer() {
+        if (customerPhone != null && !customerPhone.isEmpty()) {
+            // Check for call permission
+            if (ContextCompat.checkSelfPermission(DriverHomeActivity.this,
+                    android.Manifest.permission.CALL_PHONE) == PackageManager.PERMISSION_GRANTED) {
+                // Make the call
+                Intent intent = new Intent(Intent.ACTION_CALL);
+                intent.setData(Uri.parse("tel:" + customerPhone));
+                startActivity(intent);
+            } else {
+                // Request permission
+                ActivityCompat.requestPermissions(DriverHomeActivity.this,
+                        new String[]{android.Manifest.permission.CALL_PHONE}, 2);
+            }
+        } else {
+            Toast.makeText(this, "Customer phone number not available", Toast.LENGTH_SHORT).show();
+        }
+    }
+
 
     private void checkForActiveRide() {
         driversRef.child(driverId).child("currentRideId").addListenerForSingleValueEvent(new ValueEventListener() {
@@ -628,6 +664,8 @@ public class DriverHomeActivity extends AppCompatActivity implements OnMapReadyC
                                                     User customer = snapshot.getValue(User.class);
                                                     if (customer != null) {
                                                         customerNameTextView.setText(customer.getName());
+                                                        customerPhoneTextView.setText(customer.getPhone());
+                                                        customerPhone = customer.getPhone();
                                                     }
                                                 }
                                             }

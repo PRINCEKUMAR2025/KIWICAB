@@ -530,6 +530,11 @@ public class CustomerHomeActivity extends AppCompatActivity implements OnMapRead
         requestRideBtn.setVisibility(View.VISIBLE);
         destinationEditText.setText("");
 
+        LinearLayout driverDetailsLayout = findViewById(R.id.driverDetailsLayout);
+        if (driverDetailsLayout != null) {
+            driverDetailsLayout.setVisibility(View.GONE);
+        }
+
         // Clear destination marker
         if (destinationMarker != null) {
             destinationMarker.remove();
