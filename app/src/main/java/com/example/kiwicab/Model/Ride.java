@@ -11,6 +11,11 @@ public class Ride {
     private long timestamp;
     private double distance;
 
+    private static final double BASE_FARE = 50.0; // Base fare in ₹
+    private static final double PRICE_PER_KM = 10.0; // ₹ per kilometer
+    private static final double PRICE_PER_MINUTE = 2.0; // ₹ per minute
+    private static final double BOOKING_FEE = 20.0; // Fixed booking fee
+
     public Ride() {
         // Required empty constructor for Firebase
     }
@@ -23,13 +28,29 @@ public class Ride {
         this.status = "requested";
         this.timestamp = System.currentTimeMillis();
         this.distance = distance;
-        this.fare = calculateFare(distance);
+        this.fare = calculateFare();
     }
 
-    private double calculateFare(double distance) {
-        // Base fare + distance fare (example calculation)
-        return 50 + (distance * 10);
+    private double calculateFare() {
+        // Calculate estimated time in minutes (assuming average speed of 30 km/h)
+        double estimatedTimeInMinutes = (distance / 30.0) * 60.0;
+
+        // Calculate fare components
+        double distanceFare = distance * PRICE_PER_KM;
+        double timeFare = estimatedTimeInMinutes * PRICE_PER_MINUTE;
+
+        // Total fare = base fare + distance fare + time fare + booking fee
+        double totalFare = BASE_FARE + distanceFare + timeFare + BOOKING_FEE;
+
+        // Round to nearest whole number
+        return Math.round(totalFare);
     }
+
+    public void recalculateFare() {
+        this.fare = calculateFare();
+    }
+
+
 
     // Getters and setters
     public String getId() {
@@ -102,5 +123,7 @@ public class Ride {
 
     public void setDistance(double distance) {
         this.distance = distance;
+        // Recalculate fare when distance changes
+        recalculateFare();
     }
 }

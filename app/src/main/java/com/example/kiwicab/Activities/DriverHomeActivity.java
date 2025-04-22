@@ -552,7 +552,7 @@ public class DriverHomeActivity extends AppCompatActivity implements OnMapReadyC
     private void showPaymentConfirmation() {
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
         builder.setTitle("Ride Completed")
-                .setMessage("Payment has been processed successfully.")
+                .setMessage("Payment has been initiated successfully.")
                 .setPositiveButton("OK", null)
                 .show();
     }

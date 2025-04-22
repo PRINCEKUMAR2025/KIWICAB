@@ -27,6 +27,9 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import android.Manifest;
+
+import com.airbnb.lottie.Lottie;
+import com.airbnb.lottie.LottieAnimationView;
 import com.example.kiwicab.Model.Driver;
 import com.example.kiwicab.Model.Location;
 import com.example.kiwicab.Model.Ride;
@@ -376,7 +379,7 @@ public class CustomerHomeActivity extends AppCompatActivity implements OnMapRead
                 statusTextView.setText("Looking for a driver...");
                 break;
             case "accepted":
-                statusTextView.setText("Ride Confirmed: Driver is coming to pick you up");
+                statusTextView.setText("Confirmed: Driver is coming to pick you up");
                 // Get driver details and show on UI
                 getDriverDetails(ride.getDriverId());
                 break;
@@ -394,7 +397,18 @@ public class CustomerHomeActivity extends AppCompatActivity implements OnMapRead
                 resetRideUI();
                 break;
         }
+
+        // Update fare display with the calculated fare
+        TextView fareTextView = findViewById(R.id.fareTextView);
+        fareTextView.setText(String.format("₹%.2f", ride.getFare()));
+
+        // You might also want to show the distance
+        TextView distanceTextView = findViewById(R.id.estimatedDistance);
+        if (distanceTextView != null) {
+            distanceTextView.setText(String.format("%.2f km", ride.getDistance()));
+        }
     }
+
 
     private void getDriverDetails(String driverId) {
         driversRef.child(driverId).addListenerForSingleValueEvent(new ValueEventListener() {
