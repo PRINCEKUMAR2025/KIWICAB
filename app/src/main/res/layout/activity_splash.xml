@@ -20,7 +20,7 @@
         android:layout_below="@id/logoImageView"
         android:layout_centerHorizontal="true"
         android:layout_marginTop="16dp"
-        android:text="Cab Booking App"
+        android:text="KIWICAB"
         android:textColor="@android:color/white"
         android:textSize="24sp"
         android:textStyle="bold" />

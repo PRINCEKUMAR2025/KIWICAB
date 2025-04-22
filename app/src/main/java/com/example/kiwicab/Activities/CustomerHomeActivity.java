@@ -6,9 +6,13 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.Toolbar;
 import androidx.cardview.widget.CardView;
 import androidx.core.app.ActivityCompat;
+import androidx.core.app.NotificationCompat;
 import androidx.core.content.ContextCompat;
 
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
 import android.app.ProgressDialog;
+import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.SharedPreferences;
@@ -17,6 +21,7 @@ import android.location.Address;
 import android.location.Geocoder;
 
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -400,6 +405,7 @@ public class CustomerHomeActivity extends AppCompatActivity implements OnMapRead
                 break;
             case "accepted":
                 statusTextView.setText("Confirmed: Driver is coming to pick you up");
+                showNotification("Ride Accepted", "Driver is coming!");
                 // Get driver details and show on UI
                 getDriverDetails(ride.getDriverId());
                 if (ride.getDriverId() != null) {
@@ -408,11 +414,14 @@ public class CustomerHomeActivity extends AppCompatActivity implements OnMapRead
                 break;
             case "ongoing":
                 statusTextView.setText("Ride in progress");
+                Toast.makeText(this, "Heading Towards: "+destinationAddress, Toast.LENGTH_SHORT).show();
+                showNotification("Ride Started", "Relax: Your Ride Has Started.");
                 break;
             case "completed":
                 statusTextView.setText("Ride completed");
                 if (driverLocationListener != null && ride.getDriverId() != null) {
                     onlineDriversRef.child(ride.getDriverId()).removeEventListener(driverLocationListener);
+                    showNotification("Ride Completed", "Reached: "+destinationAddress);
                     driverLocationListener = null;
                 }
 //                showPaymentDialog(currentRideId, ride.getFare());
@@ -452,6 +461,31 @@ public class CustomerHomeActivity extends AppCompatActivity implements OnMapRead
             distanceTextView.setText(String.format("%.2f km", ride.getDistance()));
         }
     }
+
+    private void showNotification(String title, String message) {
+        NotificationManager notificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+        String channelId = "ride_status_channel";
+
+        // Create notification channel for Android O and above
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            NotificationChannel channel = new NotificationChannel(
+                    channelId,
+                    "Ride Status Notifications",
+                    NotificationManager.IMPORTANCE_DEFAULT
+            );
+            notificationManager.createNotificationChannel(channel);
+        }
+
+        NotificationCompat.Builder builder = new NotificationCompat.Builder(this, channelId)
+                .setSmallIcon(R.drawable.app_logo) // Replace with your icon
+                .setContentTitle(title)
+                .setContentText(message)
+                .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+                .setAutoCancel(true);
+
+        notificationManager.notify(1, builder.build()); // 1 is the notification ID
+    }
+
 
 
     private void getDriverDetails(String driverId) {

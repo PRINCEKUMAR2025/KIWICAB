@@ -67,6 +67,8 @@ dependencies {
     implementation("com.stripe:stripe-android:17.2.0")
     implementation("com.android.volley:volley:1.2.1")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    implementation("com.google.code.gson:gson:2.9.0")
+    implementation("com.google.maps.android:android-maps-utils:2.3.0")
 
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.2.1")

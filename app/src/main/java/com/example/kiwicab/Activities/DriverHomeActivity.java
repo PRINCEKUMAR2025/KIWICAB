@@ -8,6 +8,7 @@ import androidx.cardview.widget.CardView;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
+import android.app.ProgressDialog;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
@@ -29,6 +30,7 @@ import android.Manifest;
 import com.example.kiwicab.Model.Ride;
 import com.example.kiwicab.Model.User;
 import com.example.kiwicab.R;
+import com.example.kiwicab.Utils.PolylineUtils;
 import com.google.android.gms.location.FusedLocationProviderClient;
 import com.google.android.gms.location.LocationCallback;
 import com.google.android.gms.location.LocationRequest;
@@ -54,7 +56,18 @@ import com.google.firebase.database.MutableData;
 import com.google.firebase.database.Transaction;
 import com.google.firebase.database.ValueEventListener;
 
+import org.json.JSONArray;
+import org.json.JSONObject;
+
+import java.io.IOException;
 import java.util.HashMap;
+import java.util.List;
+
+import okhttp3.Call;
+import okhttp3.Callback;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.Response;
 
 public class DriverHomeActivity extends AppCompatActivity implements OnMapReadyCallback {
 
@@ -80,6 +93,7 @@ public class DriverHomeActivity extends AppCompatActivity implements OnMapReadyC
     private TextView customerPhoneTextView;
     private Button callCustomerBtn;
     private String customerPhone;
+    private ProgressDialog progressDialog;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -523,16 +537,160 @@ public class DriverHomeActivity extends AppCompatActivity implements OnMapReadyC
     }
 
     private void drawRoute(LatLng origin, LatLng destination, int color) {
-        // Note: In a real app, you would use Google Directions API to get the route
-        // This is a simplified version that just draws a straight line
-        PolylineOptions polylineOptions = new PolylineOptions()
-                .add(origin)
-                .add(destination)
-                .width(5)
-                .color(color);
+        // Show a loading indicator
+        showLoadingIndicator("Getting route...");
 
-        mMap.addPolyline(polylineOptions);
+        // Build the OSRM API URL
+        String url = "https://router.project-osrm.org/route/v1/driving/" +
+                origin.longitude + "," + origin.latitude + ";" +
+                destination.longitude + "," + destination.latitude +
+                "?overview=full&geometries=polyline&steps=true";
+
+        // Create OkHttp client
+        OkHttpClient client = new OkHttpClient();
+        Request request = new Request.Builder()
+                .url(url)
+                .build();
+
+        // Execute the request asynchronously
+        client.newCall(request).enqueue(new Callback() {
+            @Override
+            public void onFailure(Call call, IOException e) {
+                // Handle failure - fall back to simple route
+                runOnUiThread(() -> {
+                    hideLoadingIndicator();
+                    Toast.makeText(DriverHomeActivity.this,
+                            "Failed to get route: " + e.getMessage(),
+                            Toast.LENGTH_SHORT).show();
+
+                    // Fallback to straight line
+                    PolylineOptions fallbackOptions = new PolylineOptions()
+                            .add(origin)
+                            .add(destination)
+                            .width(5)
+                            .color(color);
+
+                    mMap.addPolyline(fallbackOptions);
+                });
+            }
+
+            @Override
+            public void onResponse(Call call, Response response) throws IOException {
+                if (response.isSuccessful()) {
+                    try {
+                        String responseData = response.body().string();
+                        JSONObject jsonObject = new JSONObject(responseData);
+
+                        // Check if the route was found
+                        String status = jsonObject.getString("code");
+                        if ("Ok".equals(status)) {
+                            JSONArray routes = jsonObject.getJSONArray("routes");
+                            if (routes.length() > 0) {
+                                JSONObject route = routes.getJSONObject(0);
+                                String encodedPolyline = route.getString("geometry");
+
+                                // Get additional information
+                                double distance = route.getDouble("distance"); // in meters
+                                double duration = route.getDouble("duration"); // in seconds
+
+                                // Decode the polyline
+                                List<LatLng> decodedPath = PolylineUtils.decode(encodedPolyline);
+
+                                // Update UI on the main thread
+                                runOnUiThread(() -> {
+                                    hideLoadingIndicator();
+
+                                    // Draw the polyline
+                                    PolylineOptions options = new PolylineOptions()
+                                            .addAll(decodedPath)
+                                            .width(5)
+                                            .color(color);
+                                    mMap.addPolyline(options);
+
+                                    // Optionally show distance and duration
+                                    String distanceText = String.format("%.1f km", distance / 1000);
+                                    String durationText = String.format("%d min", (int)(duration / 60));
+
+                                    Toast.makeText(DriverHomeActivity.this,
+                                            "Distance: " + distanceText + " | ETA: " + durationText,
+                                            Toast.LENGTH_SHORT).show();
+                                });
+                            }
+                        } else {
+                            // No route found, fall back to straight line
+                            runOnUiThread(() -> {
+                                hideLoadingIndicator();
+                                Toast.makeText(DriverHomeActivity.this,
+                                        "No route found",
+                                        Toast.LENGTH_SHORT).show();
+
+                                // Fallback to straight line
+                                PolylineOptions fallbackOptions = new PolylineOptions()
+                                        .add(origin)
+                                        .add(destination)
+                                        .width(5)
+                                        .color(color);
+
+                                mMap.addPolyline(fallbackOptions);
+                            });
+                        }
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                        // Fall back to simple route on error
+                        runOnUiThread(() -> {
+                            hideLoadingIndicator();
+                            Toast.makeText(DriverHomeActivity.this,
+                                    "Error processing route: " + e.getMessage(),
+                                    Toast.LENGTH_SHORT).show();
+
+                            // Fallback to straight line
+                            PolylineOptions fallbackOptions = new PolylineOptions()
+                                    .add(origin)
+                                    .add(destination)
+                                    .width(5)
+                                    .color(color);
+
+                            mMap.addPolyline(fallbackOptions);
+                        });
+                    }
+                } else {
+                    // Handle unsuccessful response
+                    runOnUiThread(() -> {
+                        hideLoadingIndicator();
+                        Toast.makeText(DriverHomeActivity.this,
+                                "Server error: " + response.code(),
+                                Toast.LENGTH_SHORT).show();
+
+                        // Fallback to straight line
+                        PolylineOptions fallbackOptions = new PolylineOptions()
+                                .add(origin)
+                                .add(destination)
+                                .width(5)
+                                .color(color);
+
+                        mMap.addPolyline(fallbackOptions);
+                    });
+                }
+            }
+        });
     }
+
+
+    private void showLoadingIndicator(String message) {
+        if (progressDialog == null) {
+            progressDialog = new ProgressDialog(this);
+            progressDialog.setCancelable(false);
+        }
+        progressDialog.setMessage(message);
+        progressDialog.show();
+    }
+
+    private void hideLoadingIndicator() {
+        if (progressDialog != null && progressDialog.isShowing()) {
+            progressDialog.dismiss();
+        }
+    }
+
 
     private void acceptRide() {
         if (currentRideId != null) {
