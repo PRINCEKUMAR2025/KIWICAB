@@ -15,6 +15,7 @@ import android.location.Location;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Looper;
+import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
@@ -49,6 +50,8 @@ import com.google.firebase.database.DataSnapshot;
 import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
+import com.google.firebase.database.MutableData;
+import com.google.firebase.database.Transaction;
 import com.google.firebase.database.ValueEventListener;
 
 import java.util.HashMap;
@@ -174,6 +177,7 @@ public class DriverHomeActivity extends AppCompatActivity implements OnMapReadyC
 
         // Check if driver has an active ride
         checkForActiveRide();
+        monitorAcceptedRides();
     }
 
     @Override
@@ -329,6 +333,43 @@ public class DriverHomeActivity extends AppCompatActivity implements OnMapReadyC
             onlineDriversRef.child(driverId).child("is_available").setValue(available);
         }
     }
+    private void monitorAcceptedRides() {
+        ridesRef.orderByChild("status").equalTo("accepted").addValueEventListener(new ValueEventListener() {
+            @Override
+            public void onDataChange(@NonNull DataSnapshot snapshot) {
+                for (DataSnapshot rideSnapshot : snapshot.getChildren()) {
+                    String rideId = rideSnapshot.getKey();
+                    String acceptedDriverId = rideSnapshot.child("driverId").getValue(String.class);
+
+                    // If this is the current ride request being shown and another driver accepted it
+                    if (rideId != null && rideId.equals(currentRideId) &&
+                            acceptedDriverId != null && !acceptedDriverId.equals(driverId)) {
+                        // Hide the ride request card
+                        rideRequestCard.setVisibility(View.GONE);
+                        acceptRideBtn.setVisibility(View.GONE);
+
+                        // Reset current ride ID
+                        currentRideId = null;
+
+                        // Notify the driver
+                        Toast.makeText(DriverHomeActivity.this,
+                                "This ride has been accepted by another driver",
+                                Toast.LENGTH_SHORT).show();
+
+                        // Reset the map
+                        mMap.clear();
+                        updateMapWithCurrentLocation();
+                    }
+                }
+            }
+
+            @Override
+            public void onCancelled(@NonNull DatabaseError error) {
+                Log.e("RideAcceptance", "Error monitoring accepted rides: " + error.getMessage());
+            }
+        });
+    }
+
 
     private void listenForRideRequests() {
         // Listen for new ride requests
@@ -337,25 +378,58 @@ public class DriverHomeActivity extends AppCompatActivity implements OnMapReadyC
             public void onDataChange(@NonNull DataSnapshot snapshot) {
                 // Only process if driver is available and not on a ride
                 if (isAvailable && currentRideId == null) {
+                    boolean foundRide = false;
+
                     for (DataSnapshot rideSnapshot : snapshot.getChildren()) {
                         Ride ride = rideSnapshot.getValue(Ride.class);
 
                         if (ride != null && ride.getDriverId() == null) {
-                            // Calculate distance between driver and pickup location
-                            float[] results = new float[1];
-                            android.location.Location.distanceBetween(
-                                    driverLocation.latitude, driverLocation.longitude,
-                                    ride.getPickupLocation().getLatitude(), ride.getPickupLocation().getLongitude(),
-                                    results);
+                            // Double-check the ride status by making a single-value query
+                            // This ensures we have the most up-to-date status
+                            ridesRef.child(ride.getId()).addListenerForSingleValueEvent(new ValueEventListener() {
+                                @Override
+                                public void onDataChange(@NonNull DataSnapshot rideCheck) {
+                                    if (rideCheck.exists()) {
+                                        String currentStatus = rideCheck.child("status").getValue(String.class);
+                                        String currentDriverId = rideCheck.child("driverId").getValue(String.class);
 
-                            float distanceInKm = results[0] / 1000;
+                                        // Only proceed if the ride is still in "requested" status and has no driver
+                                        if ("requested".equals(currentStatus) && currentDriverId == null) {
+                                            // Calculate distance between driver and pickup location
+                                            float[] results = new float[1];
+                                            android.location.Location.distanceBetween(
+                                                    driverLocation.latitude, driverLocation.longitude,
+                                                    ride.getPickupLocation().getLatitude(), ride.getPickupLocation().getLongitude(),
+                                                    results);
 
-                            // Only show requests within 5km
-                            if (distanceInKm <= 25) {
-                                // Show ride request
-                                showRideRequest(ride);
-                                break;
-                            }
+                                            float distanceInKm = results[0] / 1000;
+
+                                            // Only show requests within 25km
+                                            if (distanceInKm <= 25) {
+                                                // Show ride request
+                                                showRideRequest(ride);
+                                            }
+                                        } else if ("accepted".equals(currentStatus) && currentRideId != null && currentRideId.equals(ride.getId())) {
+                                            // This ride was just accepted by another driver
+                                            rideRequestCard.setVisibility(View.GONE);
+                                            currentRideId = null;
+                                            Toast.makeText(DriverHomeActivity.this,
+                                                    "Ride already taken by another driver",
+                                                    Toast.LENGTH_SHORT).show();
+                                        }
+                                    }
+                                }
+
+                                @Override
+                                public void onCancelled(@NonNull DatabaseError error) {
+                                    Toast.makeText(DriverHomeActivity.this,
+                                            "Database error: " + error.getMessage(),
+                                            Toast.LENGTH_SHORT).show();
+                                }
+                            });
+
+                            // Only process one ride at a time
+                            break;
                         }
                     }
                 }
@@ -367,6 +441,7 @@ public class DriverHomeActivity extends AppCompatActivity implements OnMapReadyC
             }
         });
     }
+
 
     private void showRideRequest(final Ride ride) {
         currentRideId = ride.getId();
@@ -461,24 +536,71 @@ public class DriverHomeActivity extends AppCompatActivity implements OnMapReadyC
 
     private void acceptRide() {
         if (currentRideId != null) {
-            // Update ride with driver id
-            ridesRef.child(currentRideId).child("driverId").setValue(driverId);
-            ridesRef.child(currentRideId).child("status").setValue("accepted");
+            // Show loading indicator
+            final android.app.ProgressDialog progressDialog = new android.app.ProgressDialog(this);
+            progressDialog.setMessage("Accepting ride...");
+            progressDialog.setCancelable(false);
+            progressDialog.show();
 
-            // Update driver's current ride
-            driversRef.child(driverId).child("currentRideId").setValue(currentRideId);
+            // Use transaction to safely accept the ride
+            DatabaseReference rideRef = ridesRef.child(currentRideId);
+            rideRef.runTransaction(new Transaction.Handler() {
+                @Override
+                public Transaction.Result doTransaction(MutableData mutableData) {
+                    Ride ride = mutableData.getValue(Ride.class);
 
-            // Update UI
-            acceptRideBtn.setVisibility(View.GONE);
-            startRideBtn.setVisibility(View.VISIBLE);
-            statusTextView.setText("Ride accepted. Navigate to pickup location.");
+                    // Check if ride exists and is still in "requested" status
+                    if (ride != null && "requested".equals(ride.getStatus()) && ride.getDriverId() == null) {
+                        // Ride is available, update it
+                        ride.setStatus("accepted");
+                        ride.setDriverId(driverId);
+                        mutableData.setValue(ride);
+                        return Transaction.success(mutableData);
+                    }
 
-            // Send notification to customer (in a real app)
+                    // Ride is already taken or doesn't exist
+                    return Transaction.abort();
+                }
 
-            // Listen for ride updates
-            listenForRideUpdates();
+                @Override
+                public void onComplete(DatabaseError error, boolean committed, DataSnapshot snapshot) {
+                    progressDialog.dismiss();
+
+                    if (committed) {
+                        // Success! This driver got the ride
+                        // Update driver's current ride
+                        driversRef.child(driverId).child("currentRideId").setValue(currentRideId);
+
+                        // Update UI
+                        acceptRideBtn.setVisibility(View.GONE);
+                        startRideBtn.setVisibility(View.VISIBLE);
+                        statusTextView.setText("Ride accepted. Navigate to pickup location.");
+
+                        // Listen for ride updates
+                        listenForRideUpdates();
+
+                        Toast.makeText(DriverHomeActivity.this,
+                                "Ride accepted successfully!",
+                                Toast.LENGTH_SHORT).show();
+                    } else {
+                        // Failed to get the ride
+                        Toast.makeText(DriverHomeActivity.this,
+                                "This ride is no longer available",
+                                Toast.LENGTH_SHORT).show();
+
+                        // Reset UI
+                        rideRequestCard.setVisibility(View.GONE);
+                        currentRideId = null;
+
+                        // Reset the map
+                        mMap.clear();
+                        updateMapWithCurrentLocation();
+                    }
+                }
+            });
         }
     }
+
 
     private void startRide() {
         if (currentRideId != null) {
@@ -728,6 +850,7 @@ public class DriverHomeActivity extends AppCompatActivity implements OnMapReadyC
             stopLocationUpdates();
         }
     }
+
 
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {

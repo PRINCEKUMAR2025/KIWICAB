@@ -28,7 +28,7 @@ public class LoginActivity extends AppCompatActivity {
 
     private EditText emailEditText, passwordEditText;
     private Button loginBtn;
-    private TextView moveToRegister;
+    private TextView moveToRegister,forgotPass;
     private FirebaseAuth mAuth;
     private ProgressDialog loadingBar;
 
@@ -45,6 +45,7 @@ public class LoginActivity extends AppCompatActivity {
         passwordEditText = findViewById(R.id.loginPasswordEditText);
         loginBtn = findViewById(R.id.loginLoginBtn);
         moveToRegister = findViewById(R.id.moveToRegisterTextView);
+        forgotPass=findViewById(R.id.forgotPasswordTextView);
 
         // Set click listeners
         loginBtn.setOnClickListener(new View.OnClickListener() {
@@ -58,6 +59,13 @@ public class LoginActivity extends AppCompatActivity {
             @Override
             public void onClick(View v) {
                 startActivity(new Intent(LoginActivity.this, RegisterActivity.class));
+            }
+        });
+
+        forgotPass.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                startActivity(new Intent(LoginActivity.this, ForgotPassActivity.class));
             }
         });
     }
