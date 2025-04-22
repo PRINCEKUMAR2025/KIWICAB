@@ -4,7 +4,7 @@ public class Driver extends User {
     private VehicleDetails vehicleDetails;
     private boolean isAvailable;
     private Location currentLocation;
-
+    private String profileImageUrl;
     public Driver() {
         // Required empty constructor for Firebase
     }
@@ -38,5 +38,12 @@ public class Driver extends User {
 
     public void setCurrentLocation(Location currentLocation) {
         this.currentLocation = currentLocation;
+    }
+    public String getProfileImageUrl() {
+        return profileImageUrl;
+    }
+
+    public void setProfileImageUrl(String profileImageUrl) {
+        this.profileImageUrl = profileImageUrl;
     }
 }

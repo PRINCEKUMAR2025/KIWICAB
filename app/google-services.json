@@ -1,14 +1,33 @@
 {
   "project_info": {
-    "project_number": "892173482623",
-    "firebase_url": "https://kiwicab-ad16e-default-rtdb.firebaseio.com",
-    "project_id": "kiwicab-ad16e",
-    "storage_bucket": "kiwicab-ad16e.firebasestorage.app"
+    "project_number": "202857581315",
+    "firebase_url": "https://chat-app-ff6e4-default-rtdb.asia-southeast1.firebasedatabase.app",
+    "project_id": "chat-app-ff6e4",
+    "storage_bucket": "chat-app-ff6e4.appspot.com"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:892173482623:android:3854fc2b226ecca9a49d4a",
+        "mobilesdk_app_id": "1:202857581315:android:557224b187a22853c27736",
+        "android_client_info": {
+          "package_name": "com.example.chatcraze"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDA6Tys_YSXdukvhgdzzCFIf0QrTw-mnBQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:202857581315:android:f87e170eb4f11a0bc27736",
         "android_client_info": {
           "package_name": "com.example.kiwicab"
         }
@@ -16,7 +35,7 @@
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyDJt37MOY8QSYHTQnBtMJzA6t3itqKeJbE"
+          "current_key": "AIzaSyDA6Tys_YSXdukvhgdzzCFIf0QrTw-mnBQ"
         }
       ],
       "services": {

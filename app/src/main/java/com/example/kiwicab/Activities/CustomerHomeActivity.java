@@ -14,14 +14,22 @@ import android.content.pm.PackageManager;
 import android.location.Address;
 import android.location.Geocoder;
 
+import android.net.Uri;
 import android.os.Bundle;
+import android.os.Handler;
 import android.os.Looper;
+import android.os.SystemClock;
 import android.text.TextUtils;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
+import android.view.animation.Interpolator;
+import android.view.animation.LinearInterpolator;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.ImageButton;
+import android.widget.ImageView;
+import android.widget.LinearLayout;
 import android.widget.RatingBar;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -30,6 +38,7 @@ import android.Manifest;
 
 import com.airbnb.lottie.Lottie;
 import com.airbnb.lottie.LottieAnimationView;
+import com.bumptech.glide.Glide;
 import com.example.kiwicab.Model.Driver;
 import com.example.kiwicab.Model.Location;
 import com.example.kiwicab.Model.Ride;
@@ -83,6 +92,8 @@ public class CustomerHomeActivity extends AppCompatActivity implements OnMapRead
 
     private LatLng pickupLocation, destinationLocation;
     private String destinationAddress;
+    private Marker driverMarker;
+    private ValueEventListener driverLocationListener;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -382,18 +393,29 @@ public class CustomerHomeActivity extends AppCompatActivity implements OnMapRead
                 statusTextView.setText("Confirmed: Driver is coming to pick you up");
                 // Get driver details and show on UI
                 getDriverDetails(ride.getDriverId());
+                if (ride.getDriverId() != null) {
+                    trackDriverLocation(ride.getDriverId());
+                }
                 break;
             case "ongoing":
                 statusTextView.setText("Ride in progress");
                 break;
             case "completed":
                 statusTextView.setText("Ride completed");
+                if (driverLocationListener != null && ride.getDriverId() != null) {
+                    onlineDriversRef.child(ride.getDriverId()).removeEventListener(driverLocationListener);
+                    driverLocationListener = null;
+                }
                 // Show rating dialog
                 showRatingDialog(ride.getDriverId());
                 resetRideUI();
                 break;
             case "cancelled":
                 statusTextView.setText("Ride cancelled");
+                if (driverLocationListener != null && ride.getDriverId() != null) {
+                    onlineDriversRef.child(ride.getDriverId()).removeEventListener(driverLocationListener);
+                    driverLocationListener = null;
+                }
                 resetRideUI();
                 break;
         }
@@ -417,15 +439,65 @@ public class CustomerHomeActivity extends AppCompatActivity implements OnMapRead
                 if (snapshot.exists()) {
                     Driver driver = snapshot.getValue(Driver.class);
                     if (driver != null) {
-                        // Show driver details on UI
-                        // You can add TextViews for driver name, vehicle details, etc.
+                        // Show driver details layout
+                        LinearLayout driverDetailsLayout = findViewById(R.id.driverDetailsLayout);
+                        driverDetailsLayout.setVisibility(View.VISIBLE);
+
+                        // Set driver details
+                        TextView driverNameTextView = findViewById(R.id.driverNameTextView);
+                        TextView vehicleDetailsTextView = findViewById(R.id.vehicleDetailsTextView);
+                        RatingBar driverRatingBar = findViewById(R.id.driverRatingBar);
+
+                        driverNameTextView.setText(driver.getName());
+
+                        // Set vehicle details
+                        if (driver.getVehicleDetails() != null) {
+                            String vehicleInfo = driver.getVehicleDetails().getVehicleColor() + " " +
+                                    driver.getVehicleDetails().getVehicleModel() + " (" +
+                                    driver.getVehicleDetails().getVehicleNumber() + ")";
+                            vehicleDetailsTextView.setText(vehicleInfo);
+                        }
+
+                        // Set driver rating
+                        driverRatingBar.setRating(driver.getRating());
+
+                        // Set up call button
+                        ImageButton callDriverBtn = findViewById(R.id.callDriverBtn);
+                        callDriverBtn.setOnClickListener(new View.OnClickListener() {
+                            @Override
+                            public void onClick(View v) {
+                                // Check for call permission
+                                if (ContextCompat.checkSelfPermission(CustomerHomeActivity.this,
+                                        android.Manifest.permission.CALL_PHONE) == PackageManager.PERMISSION_GRANTED) {
+                                    String phoneNumber = driver.getPhone();
+                                    Intent intent = new Intent(Intent.ACTION_CALL);
+                                    intent.setData(Uri.parse("tel:" + phoneNumber));
+                                    startActivity(intent);
+                                } else {
+                                    ActivityCompat.requestPermissions(CustomerHomeActivity.this,
+                                            new String[]{android.Manifest.permission.CALL_PHONE}, 2);
+                                }
+                            }
+                        });
+
+                        // Load driver profile image
+                        ImageView driverImageView = findViewById(R.id.driverImageView);
+                        if (driver.getProfileImageUrl() != null) {
+                            Glide.with(CustomerHomeActivity.this)
+                                    .load(driver.getProfileImageUrl())
+                                    .placeholder(R.drawable.default_profile)
+                                    .error(R.drawable.default_profile)
+                                    .circleCrop()
+                                    .into(driverImageView);
+                        }
                     }
                 }
             }
 
             @Override
             public void onCancelled(@NonNull DatabaseError error) {
-                Toast.makeText(CustomerHomeActivity.this, "Database error: " + error.getMessage(), Toast.LENGTH_SHORT).show();
+                Toast.makeText(CustomerHomeActivity.this, "Database error: " + error.getMessage(),
+                        Toast.LENGTH_SHORT).show();
             }
         });
     }
@@ -468,6 +540,84 @@ public class CustomerHomeActivity extends AppCompatActivity implements OnMapRead
         if (pickupLocation != null) {
             mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(pickupLocation, 15));
         }
+    }
+    private void trackDriverLocation(String driverId) {
+        // Remove any existing listener
+        if (driverLocationListener != null) {
+            onlineDriversRef.child(driverId).removeEventListener(driverLocationListener);
+        }
+
+        // Create a new listener for driver location updates
+        driverLocationListener = onlineDriversRef.child(driverId).addValueEventListener(new ValueEventListener() {
+            @Override
+            public void onDataChange(@NonNull DataSnapshot snapshot) {
+                if (snapshot.exists()) {
+                    // Get driver location data
+                    Double latitude = snapshot.child("latitude").getValue(Double.class);
+                    Double longitude = snapshot.child("longitude").getValue(Double.class);
+
+                    if (latitude != null && longitude != null) {
+                        LatLng driverLatLng = new LatLng(latitude, longitude);
+
+                        // Update or add driver marker
+                        if (driverMarker != null) {
+                            // Animate marker to new position
+                            animateMarkerToPosition(driverMarker, driverLatLng);
+                        } else {
+                            // Create new marker for driver
+                            driverMarker = mMap.addMarker(new MarkerOptions()
+                                    .position(driverLatLng)
+                                    .title("Your Driver")
+                                    .icon(BitmapDescriptorFactory.fromResource(R.drawable.car_icon)));
+                        }
+
+                        // If pickup and destination markers exist, include all in camera view
+                        if (pickupMarker != null && destinationMarker != null) {
+                            LatLngBounds.Builder builder = new LatLngBounds.Builder();
+                            builder.include(driverLatLng);
+                            builder.include(pickupMarker.getPosition());
+                            builder.include(destinationMarker.getPosition());
+                            LatLngBounds bounds = builder.build();
+
+                            mMap.animateCamera(CameraUpdateFactory.newLatLngBounds(bounds, 100));
+                        }
+                    }
+                }
+            }
+
+            @Override
+            public void onCancelled(@NonNull DatabaseError error) {
+                Toast.makeText(CustomerHomeActivity.this, "Failed to track driver: " + error.getMessage(),
+                        Toast.LENGTH_SHORT).show();
+            }
+        });
+    }
+
+    // Helper method to animate marker movement (smooth transition)
+    private void animateMarkerToPosition(final Marker marker, final LatLng targetPosition) {
+        final LatLng startPosition = marker.getPosition();
+        final Handler handler = new Handler();
+        final long start = SystemClock.uptimeMillis();
+        final long duration = 500; // Animation duration in ms
+        final Interpolator interpolator = new LinearInterpolator();
+
+        handler.post(new Runnable() {
+            @Override
+            public void run() {
+                long elapsed = SystemClock.uptimeMillis() - start;
+                float t = interpolator.getInterpolation((float) elapsed / duration);
+
+                double lng = t * targetPosition.longitude + (1 - t) * startPosition.longitude;
+                double lat = t * targetPosition.latitude + (1 - t) * startPosition.latitude;
+
+                marker.setPosition(new LatLng(lat, lng));
+
+                // Repeat until animation is complete
+                if (t < 1.0) {
+                    handler.postDelayed(this, 16); // 60fps
+                }
+            }
+        });
     }
 
     private void showRatingDialog(final String driverId) {
@@ -608,6 +758,31 @@ public class CustomerHomeActivity extends AppCompatActivity implements OnMapRead
                 Toast.makeText(CustomerHomeActivity.this, "Database error: " + error.getMessage(), Toast.LENGTH_SHORT).show();
             }
         });
+    }
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+
+        // Remove driver location listener if it exists
+        if (driverLocationListener != null && currentRideId != null) {
+            ridesRef.child(currentRideId).addListenerForSingleValueEvent(new ValueEventListener() {
+                @Override
+                public void onDataChange(@NonNull DataSnapshot snapshot) {
+                    if (snapshot.exists()) {
+                        Ride ride = snapshot.getValue(Ride.class);
+                        if (ride != null && ride.getDriverId() != null) {
+                            onlineDriversRef.child(ride.getDriverId()).removeEventListener(driverLocationListener);
+                        }
+                    }
+                }
+
+                @Override
+                public void onCancelled(@NonNull DatabaseError error) {
+                    Toast.makeText(CustomerHomeActivity.this, "Database error: " + error.getMessage(),
+                            Toast.LENGTH_SHORT).show();
+                }
+            });
+        }
     }
 
     @Override
