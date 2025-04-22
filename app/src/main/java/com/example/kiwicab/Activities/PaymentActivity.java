@@ -273,7 +273,7 @@ public class PaymentActivity extends AppCompatActivity {
                                     // Show success message with updated balance
                                     Double newBalance = dataSnapshot.getValue(Double.class);
                                     Toast.makeText(PaymentActivity.this,
-                                            "Payment of ₹" + amount + " credited to driver. New balance: ₹" + newBalance,
+                                            "Sent ₹" + amount,
                                             Toast.LENGTH_LONG).show();
 
                                     // Finish activity and return to previous screen

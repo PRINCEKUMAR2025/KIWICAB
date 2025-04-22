@@ -21,6 +21,9 @@
         android:supportsRtl="true"
         android:theme="@style/SplashTheme">
         <activity
+            android:name=".Activities.DriverEarningsActivity"
+            android:exported="false" />
+        <activity
             android:name=".Activities.PaymentActivity"
             android:exported="false" />
 

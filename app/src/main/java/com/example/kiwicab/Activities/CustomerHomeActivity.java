@@ -8,6 +8,7 @@ import androidx.cardview.widget.CardView;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
+import android.app.ProgressDialog;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.SharedPreferences;
@@ -21,6 +22,7 @@ import android.os.Handler;
 import android.os.Looper;
 import android.os.SystemClock;
 import android.text.TextUtils;
+import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
@@ -67,7 +69,9 @@ import com.google.firebase.database.DataSnapshot;
 import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
+import com.google.firebase.database.MutableData;
 import com.google.firebase.database.ServerValue;
+import com.google.firebase.database.Transaction;
 import com.google.firebase.database.ValueEventListener;
 
 import java.io.IOException;
@@ -676,6 +680,7 @@ public class CustomerHomeActivity extends AppCompatActivity implements OnMapRead
         if (prefs.getBoolean("paid_" + rideId, false)) {
             return; // Skip showing dialog if already paid
         }
+
         View dialogView = getLayoutInflater().inflate(R.layout.dialog_payment, null);
         final EditText amountEditText = dialogView.findViewById(R.id.paymentAmountEditText);
         final RadioGroup paymentMethodGroup = dialogView.findViewById(R.id.paymentMethodGroup);
@@ -689,7 +694,7 @@ public class CustomerHomeActivity extends AppCompatActivity implements OnMapRead
                 .setPositiveButton("Pay", null) // Set to null so we can override later
                 .setNegativeButton("Cancel", null);
 
-        AlertDialog dialog = builder.create();
+        final AlertDialog dialog = builder.create();
         dialog.show();
 
         // Override the positive button to prevent auto-dismiss
@@ -716,20 +721,38 @@ public class CustomerHomeActivity extends AppCompatActivity implements OnMapRead
             }
 
             if (selectedMethodId == R.id.radioCash) {
+                // Show loading indicator
+                ProgressDialog progressDialog = new ProgressDialog(this);
+                progressDialog.setMessage("Processing payment...");
+                progressDialog.setCancelable(false);
+                progressDialog.show();
+
                 Map<String, Object> paymentData = new HashMap<>();
                 paymentData.put("amountPaid", amount);
                 paymentData.put("method", "Cash");
                 paymentData.put("timestamp", ServerValue.TIMESTAMP);
 
+                // Add completion listener to Firebase operation
                 FirebaseDatabase.getInstance().getReference()
                         .child("payments")
                         .child(rideId)
-                        .setValue(paymentData);
+                        .setValue(paymentData)
+                        .addOnCompleteListener(task -> {
+                            if (task.isSuccessful()) {
+                                // Only mark payment complete and dismiss dialog if Firebase write succeeds
+                                markPaymentComplete(rideId);
+                                Toast.makeText(this, "Cash payment recorded", Toast.LENGTH_SHORT).show();
 
-                Toast.makeText(this, "Cash payment recorded", Toast.LENGTH_SHORT).show();
-                markPaymentComplete(rideId);
-                dialog.dismiss();
+                                // Dismiss both dialogs
+                                progressDialog.dismiss();
+                                dialog.dismiss();
 
+                            } else {
+                                progressDialog.dismiss();
+                                Toast.makeText(this, "Payment failed: " + task.getException().getMessage(),
+                                        Toast.LENGTH_SHORT).show();
+                            }
+                        });
             } else if (selectedMethodId == R.id.radioCard) {
                 // Navigate to PaymentActivity for Stripe payment
                 Intent intent = new Intent(this, PaymentActivity.class);
@@ -737,10 +760,10 @@ public class CustomerHomeActivity extends AppCompatActivity implements OnMapRead
                 intent.putExtra("amountToPay", amount);
                 startActivity(intent);
                 dialog.dismiss();
+
             }
         });
     }
-
 
 
     private void showRatingDialog(final String driverId) {
