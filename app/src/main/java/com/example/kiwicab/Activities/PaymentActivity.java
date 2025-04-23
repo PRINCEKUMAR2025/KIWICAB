@@ -47,8 +47,6 @@ public class PaymentActivity extends AppCompatActivity {
     PaymentSheet paymentSheet;
     FirebaseAuth auth;
     FirebaseFirestore firestore;
-    String SECRET_KEY = "yourapi";
-    String PUBLISH_KEY="yourapi";
     String customerID;
     String EmphericalKey;
     String ClientSecret;
