@@ -34,6 +34,7 @@ import android.view.MenuItem;
 import android.view.View;
 import android.view.animation.Interpolator;
 import android.view.animation.LinearInterpolator;
+import android.view.inputmethod.InputMethodManager;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageButton;
@@ -123,6 +124,7 @@ public class CustomerHomeActivity extends AppCompatActivity implements OnMapRead
     private LinearLayout cardContent;
     private boolean isCardExpanded = true;
     private List<Polyline> polylines = new ArrayList<>();
+    private boolean isPaymentDialogShowing = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -168,6 +170,11 @@ public class CustomerHomeActivity extends AppCompatActivity implements OnMapRead
         requestRideBtn.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
+
+                InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
+                if (imm != null && getCurrentFocus() != null) {
+                    imm.hideSoftInputFromWindow(getCurrentFocus().getWindowToken(), 0);
+                }
                 String destination = destinationEditText.getText().toString().trim();
                 if (TextUtils.isEmpty(destination)) {
                     destinationEditText.setError("Please enter destination");
@@ -643,26 +650,34 @@ public class CustomerHomeActivity extends AppCompatActivity implements OnMapRead
                                         polylines.add(mMap.addPolyline(options));
 
                                         // Update ETA information
-                                        int minutes = (int)(duration / 60);
+                                        int minutes = (int) (duration / 60);
                                         TextView etaTextView = findViewById(R.id.etaTextView);
                                         if (etaTextView != null) {
                                             etaTextView.setText("ETA: " + minutes + " min");
                                             etaTextView.setVisibility(View.VISIBLE);
                                         }
 
-                                        // Show all relevant points in the map view
-                                        LatLngBounds.Builder builder = new LatLngBounds.Builder();
-                                        builder.include(origin);
-                                        builder.include(destination);
-                                        for (LatLng point : decodedPath) {
-                                            builder.include(point);
-                                        }
-                                        LatLngBounds bounds = builder.build();
+                                        if (driverMarker != null && destinationMarker != null) {
 
-                                        // Add padding to the bounds
-                                        int padding = 100; // offset from edges of the map in pixels
-                                        CameraUpdate cu = CameraUpdateFactory.newLatLngBounds(bounds, padding);
-                                        mMap.animateCamera(cu);
+                                            // Show all relevant points in the map view
+                                            LatLngBounds.Builder builder = new LatLngBounds.Builder();
+                                            builder.include(origin);
+                                            builder.include(destination);
+
+                                            int numPoints = Math.min(decodedPath.size(), 10);
+                                            int step = decodedPath.size() / numPoints;
+                                            for (int i = 0; i < decodedPath.size(); i += step) {
+                                                builder.include(decodedPath.get(i));
+                                            }
+
+                                            LatLngBounds bounds = builder.build();
+
+
+                                            // Add padding to the bounds
+                                            int padding = 100; // offset from edges of the map in pixels
+                                            CameraUpdate cu = CameraUpdateFactory.newLatLngBounds(bounds, padding);
+                                            mMap.animateCamera(cu);
+                                        }
                                     }
                                 });
                             }
@@ -692,6 +707,11 @@ public class CustomerHomeActivity extends AppCompatActivity implements OnMapRead
     // Fallback method to draw a straight line
     private void drawStraightLine(LatLng driverLocation, LatLng customerLocation) {
         if (mMap != null) {
+            for (Polyline line : polylines) {
+                line.remove();
+            }
+            polylines.clear();
+
             PolylineOptions options = new PolylineOptions()
                     .add(driverLocation)
                     .add(customerLocation)
@@ -750,6 +770,7 @@ public class CustomerHomeActivity extends AppCompatActivity implements OnMapRead
                 break;
             case "ongoing":
                 statusTextView.setText("Ride in progress");
+                cancelRideBtn.setVisibility(View.GONE);
                 Toast.makeText(this, "Heading Towards: "+destinationAddress, Toast.LENGTH_SHORT).show();
                 showNotification("Ride Started", "Relax: Your Ride Has Started.");
                 break;
@@ -896,26 +917,54 @@ public class CustomerHomeActivity extends AppCompatActivity implements OnMapRead
 
     private void cancelRide() {
         if (currentRideId != null) {
-            ridesRef.child(currentRideId).child("status").setValue("cancelled")
-                    .addOnCompleteListener(new OnCompleteListener<Void>() {
-                        @Override
-                        public void onComplete(@NonNull Task<Void> task) {
-                            if (task.isSuccessful()) {
-                                // Reset customer's current ride
-                                customersRef.child(customerId).child("currentRideId").removeValue();
-                                currentRideId = null;
+            // Create a transaction to update the ride status and create a cancellation notification
+            ridesRef.child(currentRideId).runTransaction(new Transaction.Handler() {
+                @NonNull
+                @Override
+                public Transaction.Result doTransaction(@NonNull MutableData mutableData) {
+                    Ride ride = mutableData.getValue(Ride.class);
+                    if (ride == null) {
+                        return Transaction.abort();
+                    }
 
-                                // Reset UI
-                                resetRideUI();
+                    // Update ride status to cancelled
+                    ride.setStatus("cancelled");
 
-                                Toast.makeText(CustomerHomeActivity.this, "Ride cancelled", Toast.LENGTH_SHORT).show();
-                            } else {
-                                Toast.makeText(CustomerHomeActivity.this, "Failed to cancel ride: " + task.getException().getMessage(), Toast.LENGTH_SHORT).show();
-                            }
-                        }
-                    });
+                    mutableData.setValue(ride);
+                    return Transaction.success(mutableData);
+                }
+
+                @Override
+                public void onComplete(DatabaseError error, boolean committed, DataSnapshot dataSnapshot) {
+                    if (committed) {
+                        // Create a cancellation notification for all drivers
+                        DatabaseReference cancelledRidesRef = FirebaseDatabase.getInstance().getReference()
+                                .child("cancelled_rides");
+
+                        Map<String, Object> cancellationData = new HashMap<>();
+                        cancellationData.put("rideId", currentRideId);
+                        cancellationData.put("timestamp", ServerValue.TIMESTAMP);
+
+                        cancelledRidesRef.child(currentRideId).setValue(cancellationData);
+
+                        // Reset customer's current ride
+                        customersRef.child(customerId).child("currentRideId").removeValue();
+                        currentRideId = null;
+
+                        // Reset UI
+                        resetRideUI();
+
+                        Toast.makeText(CustomerHomeActivity.this, "Ride cancelled", Toast.LENGTH_SHORT).show();
+                    } else {
+                        Toast.makeText(CustomerHomeActivity.this,
+                                "Failed to cancel ride: " + (error != null ? error.getMessage() : "Unknown error"),
+                                Toast.LENGTH_SHORT).show();
+                    }
+                }
+            });
         }
     }
+
 
     private void resetRideUI() {
         rideDetailsCard.setVisibility(View.GONE);
@@ -956,20 +1005,45 @@ public class CustomerHomeActivity extends AppCompatActivity implements OnMapRead
                     if (latitude != null && longitude != null) {
                         LatLng driverLatLng = new LatLng(latitude, longitude);
 
-                        // Draw route from driver to customer (pickup location)
-                        if (pickupLocation != null) {
-                            drawRouteFromDriverToCustomer(driverLatLng, pickupLocation);
+                        // Update or add driver marker
+                        if (driverMarker != null) {
+                            // Animate marker to new position instead of recreating
+                            animateMarkerToPosition(driverMarker, driverLatLng);
+                        } else {
+                            // Create new marker for driver
+                            driverMarker = mMap.addMarker(new MarkerOptions()
+                                    .position(driverLatLng)
+                                    .title("Your Driver")
+                                    .icon(BitmapDescriptorFactory.fromResource(R.drawable.car_icon)));
                         }
 
-                        // If pickup and destination markers exist, include all in camera view
-                        if (pickupMarker != null && destinationMarker != null) {
-                            LatLngBounds.Builder builder = new LatLngBounds.Builder();
-                            builder.include(driverLatLng);
-                            builder.include(pickupMarker.getPosition());
-                            builder.include(destinationMarker.getPosition());
-                            LatLngBounds bounds = builder.build();
+                        // Draw route from driver to customer (pickup location) or destination
+                        // depending on ride status
+                        if (currentRideId != null) {
+                            ridesRef.child(currentRideId).addListenerForSingleValueEvent(new ValueEventListener() {
+                                @Override
+                                public void onDataChange(@NonNull DataSnapshot snapshot) {
+                                    if (snapshot.exists()) {
+                                        String status = snapshot.child("status").getValue(String.class);
+                                        if ("ongoing".equals(status)) {
+                                            // If ride is ongoing, draw route to destination
+                                            if (destinationLocation != null) {
+                                                drawRouteFromDriverToDestination(driverLatLng, destinationLocation);
+                                            }
+                                        } else if ("accepted".equals(status)) {
+                                            // If ride is accepted but not started, draw route to pickup
+                                            if (pickupLocation != null) {
+                                                drawRouteFromDriverToCustomer(driverLatLng, pickupLocation);
+                                            }
+                                        }
+                                    }
+                                }
 
-                            mMap.animateCamera(CameraUpdateFactory.newLatLngBounds(bounds, 100));
+                                @Override
+                                public void onCancelled(@NonNull DatabaseError error) {
+                                    Log.e("RouteUpdate", "Failed to get ride status: " + error.getMessage());
+                                }
+                            });
                         }
                     }
                 }
@@ -982,6 +1056,35 @@ public class CustomerHomeActivity extends AppCompatActivity implements OnMapRead
             }
         });
     }
+
+    private void animateMarkerToPosition(final Marker marker, final LatLng targetPosition) {
+        final Handler handler = new Handler();
+        final long start = SystemClock.uptimeMillis();
+        final long duration = 500; // Animation duration in ms
+        final Interpolator interpolator = new LinearInterpolator();
+
+        final LatLng startPosition = marker.getPosition();
+
+        handler.post(new Runnable() {
+            @Override
+            public void run() {
+                long elapsed = SystemClock.uptimeMillis() - start;
+                float t = interpolator.getInterpolation((float) elapsed / duration);
+
+                double lng = t * targetPosition.longitude + (1 - t) * startPosition.longitude;
+                double lat = t * targetPosition.latitude + (1 - t) * startPosition.latitude;
+
+                marker.setPosition(new LatLng(lat, lng));
+
+                // Repeat until animation is complete
+                if (t < 1.0) {
+                    handler.postDelayed(this, 16); // 60fps
+                }
+            }
+        });
+    }
+
+
 
 
 
@@ -1013,11 +1116,15 @@ public class CustomerHomeActivity extends AppCompatActivity implements OnMapRead
 
 
     private void showPaymentDialog(String rideId, double fareAmount) {
+        if (isPaymentDialogShowing) {
+            return;
+        }
         // Check if already paid
         SharedPreferences prefs = getSharedPreferences("ride_prefs", MODE_PRIVATE);
         if (prefs.getBoolean("paid_" + rideId, false)) {
             return; // Skip showing dialog if already paid
         }
+        isPaymentDialogShowing = true;
 
         View dialogView = getLayoutInflater().inflate(R.layout.dialog_payment, null);
         final EditText amountEditText = dialogView.findViewById(R.id.paymentAmountEditText);
@@ -1030,7 +1137,12 @@ public class CustomerHomeActivity extends AppCompatActivity implements OnMapRead
         builder.setTitle("Confirm Payment")
                 .setView(dialogView)
                 .setPositiveButton("Pay", null) // Set to null so we can override later
-                .setNegativeButton("Cancel", null);
+                .setNegativeButton("Cancel", (dialog, which) -> {
+                    isPaymentDialogShowing = false;
+                })
+                .setOnCancelListener(dialog -> {
+                    isPaymentDialogShowing = false;
+                });
 
         final AlertDialog dialog = builder.create();
         dialog.show();
@@ -1059,6 +1171,9 @@ public class CustomerHomeActivity extends AppCompatActivity implements OnMapRead
             }
 
             if (selectedMethodId == R.id.radioCash) {
+
+                dialog.getButton(AlertDialog.BUTTON_POSITIVE).setEnabled(false);
+                dialog.getButton(AlertDialog.BUTTON_NEGATIVE).setEnabled(false);
                 // Show loading indicator
                 ProgressDialog progressDialog = new ProgressDialog(this);
                 progressDialog.setMessage("Processing payment...");
@@ -1070,6 +1185,7 @@ public class CustomerHomeActivity extends AppCompatActivity implements OnMapRead
                 paymentData.put("method", "Cash");
                 paymentData.put("timestamp", ServerValue.TIMESTAMP);
 
+                markPaymentComplete(rideId);
                 // Add completion listener to Firebase operation
                 FirebaseDatabase.getInstance().getReference()
                         .child("payments")
@@ -1081,23 +1197,32 @@ public class CustomerHomeActivity extends AppCompatActivity implements OnMapRead
                                 markPaymentComplete(rideId);
                                 Toast.makeText(this, "Give Cash To Driver", Toast.LENGTH_SHORT).show();
 
-                                // Dismiss both dialogs
+//                                // Dismiss both dialogs
                                 progressDialog.dismiss();
                                 dialog.dismiss();
 
                             } else {
                                 progressDialog.dismiss();
+                                dialog.getButton(AlertDialog.BUTTON_POSITIVE).setEnabled(true);
+                                dialog.getButton(AlertDialog.BUTTON_NEGATIVE).setEnabled(true);
                                 Toast.makeText(this, "Payment failed: " + task.getException().getMessage(),
                                         Toast.LENGTH_SHORT).show();
                             }
+                            isPaymentDialogShowing = false;
                         });
             } else if (selectedMethodId == R.id.radioCard) {
+
+                // Mark as in-progress to prevent duplicate dialogs
+                SharedPreferences.Editor editor = prefs.edit();
+                editor.putBoolean("payment_in_progress_" + rideId, true);
+                editor.apply();
                 // Navigate to PaymentActivity for Stripe payment
                 Intent intent = new Intent(this, PaymentActivity.class);
                 intent.putExtra("rideId", rideId);
                 intent.putExtra("amountToPay", amount);
                 startActivity(intent);
                 dialog.dismiss();
+                isPaymentDialogShowing = false;
 
             }
         });

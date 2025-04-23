@@ -57,6 +57,7 @@ import com.google.android.gms.maps.model.MarkerOptions;
 import com.google.android.gms.maps.model.PolylineOptions;
 import com.google.android.gms.tasks.OnSuccessListener;
 import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.database.ChildEventListener;
 import com.google.firebase.database.DataSnapshot;
 import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
@@ -156,6 +157,8 @@ public class DriverHomeActivity extends AppCompatActivity implements OnMapReadyC
         statusContent = findViewById(R.id.statusContent);
         rideRequestContent = findViewById(R.id.rideRequestContent);
         rideFareTextView = findViewById(R.id.rideFareTextView);
+
+        listenForCancelledRides();
 
 // Set click listener for call button
         callCustomerBtn.setOnClickListener(new View.OnClickListener() {
@@ -373,6 +376,60 @@ public class DriverHomeActivity extends AppCompatActivity implements OnMapReadyC
             }
         };
     }
+    private void listenForCancelledRides() {
+        DatabaseReference cancelledRidesRef = FirebaseDatabase.getInstance().getReference()
+                .child("cancelled_rides");
+
+        cancelledRidesRef.addChildEventListener(new ChildEventListener() {
+            @Override
+            public void onChildAdded(@NonNull DataSnapshot snapshot, String previousChildName) {
+                if (snapshot.exists()) {
+                    String cancelledRideId = snapshot.getKey();
+
+                    // Check if this is the ride currently being shown to the driver
+                    if (cancelledRideId != null && cancelledRideId.equals(currentRideId)) {
+                        // Hide the ride request card
+                        runOnUiThread(() -> {
+                            rideRequestCard.setVisibility(View.GONE);
+                            acceptRideBtn.setVisibility(View.GONE);
+
+                            // Reset current ride ID
+                            currentRideId = null;
+
+                            // Reset the map
+                            mMap.clear();
+                            updateMapWithCurrentLocation();
+
+                            // Show notification to driver
+                            Toast.makeText(DriverHomeActivity.this,
+                                    "This ride request has been cancelled by the customer",
+                                    Toast.LENGTH_SHORT).show();
+
+                            // Resume listening for new ride requests
+                            if (isAvailable) {
+                                listenForRideRequests();
+                            }
+                        });
+                    }
+                }
+            }
+
+            @Override
+            public void onChildChanged(@NonNull DataSnapshot snapshot, String previousChildName) {}
+
+            @Override
+            public void onChildRemoved(@NonNull DataSnapshot snapshot) {}
+
+            @Override
+            public void onChildMoved(@NonNull DataSnapshot snapshot, String previousChildName) {}
+
+            @Override
+            public void onCancelled(@NonNull DatabaseError error) {
+                Log.e("CancelledRides", "Failed to listen for cancelled rides: " + error.getMessage());
+            }
+        });
+    }
+
 
     private void startLocationUpdates() {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
@@ -691,7 +748,7 @@ public class DriverHomeActivity extends AppCompatActivity implements OnMapReadyC
                     PolylineOptions fallbackOptions = new PolylineOptions()
                             .add(origin)
                             .add(destination)
-                            .width(5)
+                            .width(10)
                             .color(color);
 
                     mMap.addPolyline(fallbackOptions);
