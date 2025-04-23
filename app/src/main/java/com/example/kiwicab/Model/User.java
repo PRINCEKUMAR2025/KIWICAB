@@ -8,6 +8,7 @@ public class User {
     private String userType; // "customer" or "driver"
     private float rating;
     private String currentRideId;
+    private String profileImageUrl;
 
     // Constructor, getters, and setters
     public User() {
@@ -78,5 +79,12 @@ public class User {
 
     public void setCurrentRideId(String currentRideId) {
         this.currentRideId = currentRideId;
+    }
+    public String getProfileImageUrl() {
+        return profileImageUrl;
+    }
+
+    public void setProfileImageUrl(String profileImageUrl) {
+        this.profileImageUrl = profileImageUrl;
     }
 }

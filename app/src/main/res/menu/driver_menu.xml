@@ -17,8 +17,14 @@
         android:title="Earnings"
         app:showAsAction="never" />
     <item
+        android:id="@+id/action_carpool"
+        android:icon="@drawable/ic_logout"
+        android:title="Carpool"
+        app:showAsAction="never" />
+    <item
         android:id="@+id/action_logout"
         android:icon="@drawable/ic_logout"
         android:title="Logout"
         app:showAsAction="never" />
+
 </menu>

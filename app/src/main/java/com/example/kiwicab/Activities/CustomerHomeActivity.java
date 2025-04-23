@@ -1314,6 +1314,10 @@ public class CustomerHomeActivity extends AppCompatActivity implements OnMapRead
             // Open ride history activity
             startActivity(new Intent(CustomerHomeActivity.this, RideHistoryActivity.class));
             return true;
+        }else if (id == R.id.action_carpool) {
+            // Open ride history activity
+            startActivity(new Intent(CustomerHomeActivity.this, CarpoolHomeActivity.class));
+            return true;
         }
 
         return super.onOptionsItemSelected(item);

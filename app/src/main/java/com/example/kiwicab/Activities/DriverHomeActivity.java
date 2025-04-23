@@ -1155,6 +1155,10 @@ public class DriverHomeActivity extends AppCompatActivity implements OnMapReadyC
             // Open ride history activity
             startActivity(new Intent(DriverHomeActivity.this, DriverEarningsActivity.class));
             return true;
+        }else if (id == R.id.action_carpool) {
+            // Open ride history activity
+            startActivity(new Intent(DriverHomeActivity.this, CarpoolHomeActivity.class));
+            return true;
         }
 
         return super.onOptionsItemSelected(item);
