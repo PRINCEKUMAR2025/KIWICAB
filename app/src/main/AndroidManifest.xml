@@ -21,6 +21,9 @@
         android:supportsRtl="true"
         android:theme="@style/SplashTheme">
         <activity
+            android:name=".Activities.CarpoolHomeActivity"
+            android:exported="false" />
+        <activity
             android:name=".Activities.CarpoolDetailsActivity"
             android:exported="false" />
         <activity
@@ -28,9 +31,6 @@
             android:exported="false" />
         <activity
             android:name=".Activities.CreateCarpoolActivity"
-            android:exported="false" />
-        <activity
-            android:name=".Activities.CarpoolHomeActivity"
             android:exported="false" />
         <activity
             android:name=".Activities.ForgotPassActivity"

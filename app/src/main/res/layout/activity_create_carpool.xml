@@ -30,7 +30,25 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:text="Vehicle Information "
+                android:textStyle="bold" />
+            <EditText
+                android:id="@+id/vehicleInfo"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:background="@drawable/edit_text_background"
+                android:drawableStart="@drawable/ic_car"
+                android:drawablePadding="8dp"
+                android:hint="Swift Dzire TN109P78"
+                android:inputType="textPostalAddress"
+                android:padding="12dp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
                 android:text="Pickup Location"
+                android:layout_marginTop="16dp"
                 android:textStyle="bold" />
 
             <EditText

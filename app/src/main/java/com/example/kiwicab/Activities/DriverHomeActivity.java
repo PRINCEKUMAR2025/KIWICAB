@@ -7,6 +7,8 @@ import androidx.appcompat.widget.Toolbar;
 import androidx.cardview.widget.CardView;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
 
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
@@ -32,6 +34,8 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import android.Manifest;
+
+import com.example.kiwicab.Model.Carpool;
 import com.example.kiwicab.Model.Ride;
 import com.example.kiwicab.Model.User;
 import com.example.kiwicab.R;
@@ -58,6 +62,7 @@ import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
 import com.google.firebase.database.MutableData;
+import com.google.firebase.database.Query;
 import com.google.firebase.database.Transaction;
 import com.google.firebase.database.ValueEventListener;
 
@@ -65,6 +70,7 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 
@@ -105,6 +111,10 @@ public class DriverHomeActivity extends AppCompatActivity implements OnMapReadyC
     private boolean isRideRequestExpanded = true;
     private TextView rideFareTextView;
 
+
+    private DatabaseReference carpoolsRef;
+    private ValueEventListener carpoolRequestListener;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -122,6 +132,7 @@ public class DriverHomeActivity extends AppCompatActivity implements OnMapReadyC
         customersRef = FirebaseDatabase.getInstance().getReference().child("users").child("customers");
         ridesRef = FirebaseDatabase.getInstance().getReference().child("rides");
         onlineDriversRef = FirebaseDatabase.getInstance().getReference().child("online_drivers");
+        carpoolsRef = FirebaseDatabase.getInstance().getReference().child("carpools");
 
         // Initialize views
         SupportMapFragment mapFragment = (SupportMapFragment) getSupportFragmentManager()
@@ -529,7 +540,7 @@ public class DriverHomeActivity extends AppCompatActivity implements OnMapReadyC
                                             float distanceInKm = results[0] / 1000;
 
                                             // Only show requests within 25km
-                                            if (distanceInKm <= 25) {
+                                            if (distanceInKm <= 15) {
                                                 // Show ride request
                                                 showRideRequest(ride);
                                             }

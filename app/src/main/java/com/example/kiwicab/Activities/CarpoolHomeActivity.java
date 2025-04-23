@@ -9,6 +9,7 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.os.Looper;
+import android.view.View;
 import android.widget.Button;
 import android.widget.Toast;
 import com.example.kiwicab.Model.Carpool;
@@ -36,6 +37,10 @@ import android.Manifest;
 
 public class CarpoolHomeActivity extends AppCompatActivity implements OnMapReadyCallback {
 
+    public interface CarpoolCallback {
+        void onActiveCarpoolFound(Carpool carpool);
+    }
+
     private GoogleMap mMap;
     private FusedLocationProviderClient fusedLocationClient;
     private LocationCallback locationCallback;
@@ -60,6 +65,10 @@ public class CarpoolHomeActivity extends AppCompatActivity implements OnMapReady
         createCarpoolBtn = findViewById(R.id.createCarpoolBtn);
         findCarpoolBtn = findViewById(R.id.findCarpoolBtn);
 
+        checkUserType();
+
+
+
         // Set up map
         SupportMapFragment mapFragment = (SupportMapFragment) getSupportFragmentManager()
                 .findFragmentById(R.id.map);
@@ -72,23 +81,142 @@ public class CarpoolHomeActivity extends AppCompatActivity implements OnMapReady
 
         // Set click listeners
         createCarpoolBtn.setOnClickListener(v -> {
-            Intent intent = new Intent(CarpoolHomeActivity.this, CreateCarpoolActivity.class);
-            if (currentLocation != null) {
-                intent.putExtra("currentLat", currentLocation.latitude);
-                intent.putExtra("currentLng", currentLocation.longitude);
-            }
-            startActivity(intent);
+            checkExistingCarpoolAndProceed(
+                    () -> {
+                        // No active carpool, allow creation
+                        startActivity(new Intent(this, CreateCarpoolActivity.class));
+                    },
+                    carpool -> {
+                        // Already in a carpool, show details instead
+                        Intent intent = new Intent(this, CarpoolDetailsActivity.class);
+                        intent.putExtra("carpoolId", carpool.getId());
+                        startActivity(intent);
+                        Toast.makeText(this, "You are already in a carpool.", Toast.LENGTH_LONG).show();
+                    }
+            );
         });
 
+
         findCarpoolBtn.setOnClickListener(v -> {
-            Intent intent = new Intent(CarpoolHomeActivity.this, FindCarpoolActivity.class);
-            if (currentLocation != null) {
-                intent.putExtra("currentLat", currentLocation.latitude);
-                intent.putExtra("currentLng", currentLocation.longitude);
-            }
-            startActivity(intent);
+            checkExistingCarpoolAndProceed(
+                    () -> {
+                        // No active carpool, allow finding
+                        startActivity(new Intent(this, FindCarpoolActivity.class));
+                    },
+                    carpool -> {
+                        // Already in a carpool, show details instead
+                        Intent intent = new Intent(this, CarpoolDetailsActivity.class);
+                        intent.putExtra("carpoolId", carpool.getId());
+                        startActivity(intent);
+                        Toast.makeText(this, "You are already in a carpool.", Toast.LENGTH_LONG).show();
+                    }
+            );
         });
     }
+
+    private void checkUserType() {
+        DatabaseReference customerRef = usersRef.child("customers").child(userId);
+
+        customerRef.addListenerForSingleValueEvent(new ValueEventListener() {
+            @Override
+            public void onDataChange(@NonNull DataSnapshot snapshot) {
+                if (snapshot.exists()) {
+                    handleUserType("customer");
+                } else {
+                    DatabaseReference driverRef = usersRef.child("drivers").child(userId);
+                    driverRef.addListenerForSingleValueEvent(new ValueEventListener() {
+                        @Override
+                        public void onDataChange(@NonNull DataSnapshot snapshot) {
+                            if (snapshot.exists()) {
+                                handleUserType("driver");
+                            } else {
+                                Toast.makeText(CarpoolHomeActivity.this, "User role not recognized", Toast.LENGTH_SHORT).show();
+                            }
+                        }
+
+                        @Override
+                        public void onCancelled(@NonNull DatabaseError error) {
+                            Toast.makeText(CarpoolHomeActivity.this, "Error: " + error.getMessage(), Toast.LENGTH_SHORT).show();
+                        }
+                    });
+                }
+            }
+
+            @Override
+            public void onCancelled(@NonNull DatabaseError error) {
+                Toast.makeText(CarpoolHomeActivity.this, "Error: " + error.getMessage(), Toast.LENGTH_SHORT).show();
+            }
+        });
+    }
+
+    private void handleUserType(String userType) {
+        if (userType.equals("driver")) {
+            createCarpoolBtn.setVisibility(View.VISIBLE);
+            findCarpoolBtn.setVisibility(View.GONE);
+        } else if (userType.equals("customer")) {
+            createCarpoolBtn.setVisibility(View.GONE);
+            findCarpoolBtn.setVisibility(View.VISIBLE);
+        }
+    }
+
+
+
+
+
+    private void checkExistingCarpoolAndProceed(Runnable onNoActiveCarpool, CarpoolCallback onActiveCarpoolFound) {
+        DatabaseReference userActiveCarpoolsRef = FirebaseDatabase.getInstance()
+                .getReference().child("users").child(userId).child("activeCarpools");
+
+        userActiveCarpoolsRef.addListenerForSingleValueEvent(new ValueEventListener() {
+            @Override
+            public void onDataChange(@NonNull DataSnapshot snapshot) {
+                if (!snapshot.exists()) {
+                    // No active carpools at all
+                    onNoActiveCarpool.run();
+                    return;
+                }
+                // Check each carpoolId for active status
+                for (DataSnapshot carpoolSnap : snapshot.getChildren()) {
+                    String carpoolId = carpoolSnap.getKey();
+                    DatabaseReference carpoolRef = FirebaseDatabase.getInstance()
+                            .getReference().child("carpools").child(carpoolId);
+                    carpoolRef.addListenerForSingleValueEvent(new ValueEventListener() {
+                        @Override
+                        public void onDataChange(@NonNull DataSnapshot carpoolSnapshot) {
+                            if (carpoolSnapshot.exists()) {
+                                String status = carpoolSnapshot.child("status").getValue(String.class);
+                                if ("active".equals(status)) {
+                                    // Block: already in an active carpool
+                                    Carpool carpool = carpoolSnapshot.getValue(Carpool.class);
+                                    onActiveCarpoolFound.onActiveCarpoolFound(carpool);
+                                } else {
+                                    // Remove stale reference
+                                    userActiveCarpoolsRef.child(carpoolId).removeValue();
+                                    onNoActiveCarpool.run();
+                                }
+                            } else {
+                                // Remove stale reference
+                                userActiveCarpoolsRef.child(carpoolId).removeValue();
+                                onNoActiveCarpool.run();
+                            }
+                        }
+                        @Override
+                        public void onCancelled(@NonNull DatabaseError error) {
+                            onNoActiveCarpool.run();
+                        }
+                    });
+                    // Only check the first found carpoolId
+                    break;
+                }
+            }
+            @Override
+            public void onCancelled(@NonNull DatabaseError error) {
+                onNoActiveCarpool.run();
+            }
+        });
+    }
+
+
 
     @Override
     public void onMapReady(GoogleMap googleMap) {

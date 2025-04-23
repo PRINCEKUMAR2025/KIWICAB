@@ -32,6 +32,8 @@ import com.google.android.gms.maps.model.BitmapDescriptorFactory;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.LatLngBounds;
 import com.google.android.gms.maps.model.MarkerOptions;
+import com.google.android.gms.maps.model.Polyline;
+import com.google.android.gms.maps.model.PolylineOptions;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.database.DataSnapshot;
 import com.google.firebase.database.DatabaseError;
@@ -39,13 +41,20 @@ import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
 import com.google.firebase.database.ValueEventListener;
 
+import org.json.JSONArray;
+import org.json.JSONObject;
+
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
 
 public class CarpoolDetailsActivity extends AppCompatActivity implements OnMapReadyCallback {
 
     private GoogleMap mMap;
-    private TextView pickupTextView, destinationTextView, fareTextView, timeTextView, seatsTextView, driverNameTextView;
+    private TextView pickupTextView, destinationTextView, fareTextView, timeTextView, seatsTextView, driverNameTextView,vehicleInfoTextView;
     private Button actionBtn, chatBtn;
     private RecyclerView passengersRecyclerView;
 
@@ -53,6 +62,7 @@ public class CarpoolDetailsActivity extends AppCompatActivity implements OnMapRe
     private DatabaseReference carpoolsRef, usersRef;
     private String userId, carpoolId;
     private Carpool carpool;
+    private Polyline currentRoutePolyline;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -78,6 +88,7 @@ public class CarpoolDetailsActivity extends AppCompatActivity implements OnMapRe
         destinationTextView = findViewById(R.id.destinationTextView);
         fareTextView = findViewById(R.id.fareTextView);
         timeTextView = findViewById(R.id.timeTextView);
+        vehicleInfoTextView=findViewById(R.id.vehicleInfo);
         seatsTextView = findViewById(R.id.seatsTextView);
         actionBtn = findViewById(R.id.actionBtn);
         chatBtn = findViewById(R.id.chatBtn);
@@ -153,6 +164,7 @@ public class CarpoolDetailsActivity extends AppCompatActivity implements OnMapRe
         pickupTextView.setText(carpool.getPickupLocation().getAddress());
         destinationTextView.setText(carpool.getDestinationLocation().getAddress());
         fareTextView.setText(String.format("₹%.2f", carpool.getFare()));
+        vehicleInfoTextView.setText(carpool.getVehicleInformation().toString());
         timeTextView.setText(carpool.getDepartureTime());
         seatsTextView.setText(String.format("%d/4 seats", carpool.getPassengerCount()));
 
@@ -253,7 +265,113 @@ public class CarpoolDetailsActivity extends AppCompatActivity implements OnMapRe
     }
 
     private void drawRoute(LatLng origin, LatLng destination) {
-        // Use OSRM for route drawing (as implemented in your existing code)
+        // Build the OSRM API URL
+        String url = "https://router.project-osrm.org/route/v1/driving/"
+                + origin.longitude + "," + origin.latitude + ";"
+                + destination.longitude + "," + destination.latitude
+                + "?overview=full&geometries=polyline";
+
+        OkHttpClient client = new OkHttpClient();
+        Request request = new Request.Builder().url(url).build();
+
+        client.newCall(request).enqueue(new okhttp3.Callback() {
+            @Override
+            public void onFailure(okhttp3.Call call, IOException e) {
+                runOnUiThread(() ->
+                        Toast.makeText(CarpoolDetailsActivity.this, "Failed to get route", Toast.LENGTH_SHORT).show()
+                );
+            }
+
+            @Override
+            public void onResponse(okhttp3.Call call, okhttp3.Response response) throws IOException {
+                if (response.isSuccessful()) {
+                    try {
+                        String responseData = response.body().string();
+                        JSONObject jsonObject = new JSONObject(responseData);
+
+                        if ("Ok".equals(jsonObject.getString("code"))) {
+                            JSONArray routes = jsonObject.getJSONArray("routes");
+                            if (routes.length() > 0) {
+                                JSONObject route = routes.getJSONObject(0);
+                                String encodedPolyline = route.getString("geometry");
+                                double distance = route.getDouble("distance"); // meters
+                                double duration = route.getDouble("duration"); // seconds
+
+                                List<LatLng> decodedPath = decodePoly(encodedPolyline);
+
+                                runOnUiThread(() -> {
+                                    // Remove previous route if exists
+                                    if (currentRoutePolyline != null) {
+                                        currentRoutePolyline.remove();
+                                    }
+                                    // Draw the polyline
+                                    PolylineOptions options = new PolylineOptions()
+                                            .addAll(decodedPath)
+                                            .width(8)
+                                            .color(getResources().getColor(R.color.colorPrimary, null))
+                                            .geodesic(true);
+                                    currentRoutePolyline = mMap.addPolyline(options);
+
+                                    // Show distance
+                                    TextView distanceTextView = findViewById(R.id.distanceTextView);
+                                    if (distanceTextView != null) {
+                                        distanceTextView.setText(String.format("%.1f km, %d min",
+                                                distance / 1000, (int) (duration / 60)));
+                                    }
+
+                                    // Adjust camera to fit route
+                                    LatLngBounds.Builder builder = new LatLngBounds.Builder();
+                                    for (LatLng point : decodedPath) builder.include(point);
+                                    mMap.animateCamera(CameraUpdateFactory.newLatLngBounds(builder.build(), 100));
+                                });
+                            }
+                        } else {
+                            runOnUiThread(() ->
+                                    Toast.makeText(CarpoolDetailsActivity.this, "No route found", Toast.LENGTH_SHORT).show()
+                            );
+                        }
+                    } catch (Exception e) {
+                        runOnUiThread(() ->
+                                Toast.makeText(CarpoolDetailsActivity.this, "Error parsing route", Toast.LENGTH_SHORT).show()
+                        );
+                    }
+                } else {
+                    runOnUiThread(() ->
+                            Toast.makeText(CarpoolDetailsActivity.this, "Route request failed", Toast.LENGTH_SHORT).show()
+                    );
+                }
+            }
+        });
+    }
+    // Polyline decoder (Google/OSRM format)
+    private List<LatLng> decodePoly(String encoded) {
+        List<LatLng> poly = new ArrayList<>();
+        int index = 0, len = encoded.length();
+        int lat = 0, lng = 0;
+        while (index < len) {
+            int b, shift = 0, result = 0;
+            do {
+                b = encoded.charAt(index++) - 63;
+                result |= (b & 0x1f) << shift;
+                shift += 5;
+            } while (b >= 0x20);
+            int dlat = ((result & 1) != 0 ? ~(result >> 1) : (result >> 1));
+            lat += dlat;
+
+            shift = 0;
+            result = 0;
+            do {
+                b = encoded.charAt(index++) - 63;
+                result |= (b & 0x1f) << shift;
+                shift += 5;
+            } while (b >= 0x20);
+            int dlng = ((result & 1) != 0 ? ~(result >> 1) : (result >> 1));
+            lng += dlng;
+
+            LatLng p = new LatLng((lat / 1E5), (lng / 1E5));
+            poly.add(p);
+        }
+        return poly;
     }
 
     private void joinCarpool() {
@@ -334,20 +452,18 @@ public class CarpoolDetailsActivity extends AppCompatActivity implements OnMapRe
     private void cancelCarpool() {
         // Only the driver can cancel the carpool
         if (userId.equals(carpool.getDriverId())) {
-            // Update carpool status
-            carpoolsRef.child(carpoolId).child("status").setValue("cancelled");
+            // Delete the carpool node completely
+            carpoolsRef.child(carpoolId).removeValue();
 
-            // Notify all passengers
+            // Remove carpool from all passengers' activeCarpools
             if (carpool.getPassengers() != null) {
                 for (String passengerId : carpool.getPassengers().keySet()) {
-                    // Remove carpool from passenger's active carpools
                     usersRef.child(passengerId).child("activeCarpools").child(carpoolId).removeValue();
-
                     // Send notification to passenger (in a real app)
                 }
             }
 
-            Toast.makeText(this, "Carpool cancelled", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, "Carpool deleted", Toast.LENGTH_SHORT).show();
             finish();
         } else {
             Toast.makeText(this, "Only the driver can cancel the carpool", Toast.LENGTH_SHORT).show();

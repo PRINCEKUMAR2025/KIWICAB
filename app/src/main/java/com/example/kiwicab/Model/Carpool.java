@@ -6,6 +6,8 @@ import java.util.Map;
 public class Carpool {
     private String id;
     private String driverId;
+
+    private String vehicleInformation;
     private Location pickupLocation;
     private Location destinationLocation;
     private double fare;
@@ -21,11 +23,12 @@ public class Carpool {
     public Carpool() {
     }
 
-    public Carpool(String id, String driverId, Location pickupLocation,
+    public Carpool(String id, String driverId,String vehicleInformation, Location pickupLocation,
                    Location destinationLocation, double fare, String departureTime,
                    double distance, long timestamp) {
         this.id = id;
         this.driverId = driverId;
+        this.vehicleInformation=vehicleInformation;
         this.pickupLocation = pickupLocation;
         this.destinationLocation = destinationLocation;
         this.fare = fare;
@@ -136,5 +139,12 @@ public class Carpool {
 
     public void setFull(boolean full) {
         isFull = full;
+    }
+    public String getVehicleInformation() {
+        return vehicleInformation;
+    }
+
+    public void setVehicleInformation(String vehicleInformation) {
+        this.vehicleInformation = vehicleInformation;
     }
 }

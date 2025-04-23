@@ -40,7 +40,7 @@ import java.util.Map;
 public class CreateCarpoolActivity extends AppCompatActivity implements OnMapReadyCallback {
 
     private GoogleMap mMap;
-    private EditText pickupEditText, destinationEditText, fareEditText, departureTimeEditText;
+    private EditText vehicleInfoEditText,pickupEditText, destinationEditText, fareEditText, departureTimeEditText;
     private Button createCarpoolBtn;
     private LatLng pickupLocation, destinationLocation;
     private String pickupAddress, destinationAddress;
@@ -61,6 +61,7 @@ public class CreateCarpoolActivity extends AppCompatActivity implements OnMapRea
 
         // Initialize views
         pickupEditText = findViewById(R.id.pickupEditText);
+        vehicleInfoEditText=findViewById(R.id.vehicleInfo);
         destinationEditText = findViewById(R.id.destinationEditText);
         fareEditText = findViewById(R.id.fareEditText);
         departureTimeEditText = findViewById(R.id.departureTimeEditText);
@@ -79,6 +80,7 @@ public class CreateCarpoolActivity extends AppCompatActivity implements OnMapRea
             // Get the text from EditText fields
             String pickupAddressText = pickupEditText.getText().toString().trim();
             String destinationAddressText = destinationEditText.getText().toString().trim();
+            String vehicleInfo=vehicleInfoEditText.getText().toString().trim();
 
             // Validate input
             if (TextUtils.isEmpty(pickupAddressText)) {
@@ -88,6 +90,10 @@ public class CreateCarpoolActivity extends AppCompatActivity implements OnMapRea
 
             if (TextUtils.isEmpty(destinationAddressText)) {
                 destinationEditText.setError("Please enter destination location");
+                return;
+            }
+            if (TextUtils.isEmpty(vehicleInfo)) {
+                vehicleInfoEditText.setError("Please enter vehicle information");
                 return;
             }
 
@@ -240,6 +246,7 @@ public class CreateCarpoolActivity extends AppCompatActivity implements OnMapRea
         if (pickupLocation == null || destinationLocation == null) {
             String pickupAddressText = pickupEditText.getText().toString().trim();
             String destinationAddressText = destinationEditText.getText().toString().trim();
+            String vehicleInfo=vehicleInfoEditText.getText().toString().trim();
 
             // Validate input
             if (TextUtils.isEmpty(pickupAddressText)) {
@@ -249,6 +256,10 @@ public class CreateCarpoolActivity extends AppCompatActivity implements OnMapRea
 
             if (TextUtils.isEmpty(destinationAddressText)) {
                 destinationEditText.setError("Please enter destination location");
+                return;
+            }
+            if (TextUtils.isEmpty(vehicleInfo)) {
+                vehicleInfoEditText.setError("Please enter vehicle information");
                 return;
             }
 
@@ -265,6 +276,7 @@ public class CreateCarpoolActivity extends AppCompatActivity implements OnMapRea
 
         String fareStr = fareEditText.getText().toString().trim();
         String departureTime = departureTimeEditText.getText().toString().trim();
+        String vehicleInfo=vehicleInfoEditText.getText().toString().trim();
 
         if (TextUtils.isEmpty(fareStr)) {
             fareEditText.setError("Please enter fare amount");
@@ -276,7 +288,9 @@ public class CreateCarpoolActivity extends AppCompatActivity implements OnMapRea
             return;
         }
 
+
         double fare = Double.parseDouble(fareStr);
+        String VI=vehicleInfo;
 
         // Create carpool ID
         String carpoolId = carpoolsRef.push().getKey();
@@ -301,6 +315,7 @@ public class CreateCarpoolActivity extends AppCompatActivity implements OnMapRea
         Carpool carpool = new Carpool(
                 carpoolId,
                 userId,
+                VI,
                 pickupLocationObj,
                 destinationLocationObj,
                 fare,

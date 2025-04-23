@@ -25,16 +25,10 @@
                 android:orientation="vertical">
 
                 <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Driver"
-                    android:textSize="12sp" />
-
-                <TextView
                     android:id="@+id/driverNameTextView"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Driver Name"
+                    android:text="Created By Driver"
                     android:textSize="16sp"
                     android:textStyle="bold" />
             </LinearLayout>
