@@ -47,8 +47,8 @@ public class PaymentActivity extends AppCompatActivity {
     PaymentSheet paymentSheet;
     FirebaseAuth auth;
     FirebaseFirestore firestore;
-    String SECRET_KEY = "sk_test_51Os3QnSGRnnzLmir6qr1NcJJrcHJaZtvt7tOV9suMGRklSkaCtEbYeQNYTJfBImKhwLzndje57CqP22283OaB0fH009sux7Cta";
-    String PUBLISH_KEY="pk_test_51Os3QnSGRnnzLmir77n9qIxmPS3WcbFy4DEQ5jiu7H1RBx5ud7Uzqj0R42zo7mMi4RLlI0X3lFGicbDTpeZuFr5d00ylj0mYBh";
+    String SECRET_KEY = "yourapi";
+    String PUBLISH_KEY="yourapi";
     String customerID;
     String EmphericalKey;
     String ClientSecret;
@@ -77,7 +77,7 @@ public class PaymentActivity extends AppCompatActivity {
             public void onDataChange(@NonNull DataSnapshot snapshot) {
                 if (snapshot.exists()) {
                     String driverId = snapshot.child("driverId").getValue(String.class);
-                    DriverWallet.setText("Sending Rs: "+AmountToPay +" to "+driverId);
+                    DriverWallet.setText("Sending Rs: "+AmountToPay +" to driver");
                     Log.d("RideInfo", "Driver UID: " + driverId);
 
                     // you can use driverId now for payment, UI, messages, etc
