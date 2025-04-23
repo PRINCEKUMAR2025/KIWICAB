@@ -58,6 +58,7 @@ import com.google.android.gms.location.LocationCallback;
 import com.google.android.gms.location.LocationRequest;
 import com.google.android.gms.location.LocationResult;
 import com.google.android.gms.location.LocationServices;
+import com.google.android.gms.maps.CameraUpdate;
 import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.OnMapReadyCallback;
@@ -67,6 +68,7 @@ import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.LatLngBounds;
 import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
+import com.google.android.gms.maps.model.Polyline;
 import com.google.android.gms.maps.model.PolylineOptions;
 import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.OnSuccessListener;
@@ -120,6 +122,7 @@ public class CustomerHomeActivity extends AppCompatActivity implements OnMapRead
     private ImageButton toggleCardBtn;
     private LinearLayout cardContent;
     private boolean isCardExpanded = true;
+    private List<Polyline> polylines = new ArrayList<>();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -435,6 +438,19 @@ public class CustomerHomeActivity extends AppCompatActivity implements OnMapRead
                     Ride ride = snapshot.getValue(Ride.class);
 
                     if (ride != null) {
+                        if ("ongoing".equals(ride.getStatus().toString())) {
+                            // Get driver's current location and destination
+                            if (ride.getDriverId() != null && driverMarker != null) {
+                                LatLng driverLocation = driverMarker.getPosition();
+                                LatLng destinationLatLng = new LatLng(
+                                        ride.getDestinationLocation().getLatitude(),
+                                        ride.getDestinationLocation().getLongitude()
+                                );
+
+                                // Draw route from driver to destination
+                                drawRouteFromDriverToDestination(driverLocation, destinationLatLng);
+                            }
+                        }
                         updateRideUI(ride);
                     }
                 }
@@ -446,6 +462,7 @@ public class CustomerHomeActivity extends AppCompatActivity implements OnMapRead
             }
         });
     }
+
 
     private void drawRouteFromDriverToCustomer(LatLng driverLocation, LatLng customerLocation) {
         // Build the OSRM API URL
@@ -556,6 +573,116 @@ public class CustomerHomeActivity extends AppCompatActivity implements OnMapRead
                     // Handle unsuccessful response
                     runOnUiThread(() -> {
                         drawStraightLine(driverLocation, customerLocation);
+                    });
+                }
+            }
+        });
+    }
+    private void drawRouteFromDriverToDestination(LatLng origin, LatLng destination) {
+        // Build the OSRM API URL
+        String url = "https://router.project-osrm.org/route/v1/driving/" +
+                origin.longitude + "," + origin.latitude + ";" +
+                destination.longitude + "," + destination.latitude +
+                "?overview=full&geometries=polyline";
+
+        // Create OkHttp client
+        OkHttpClient client = new OkHttpClient();
+        Request request = new Request.Builder()
+                .url(url)
+                .build();
+
+        // Execute the request asynchronously
+        client.newCall(request).enqueue(new okhttp3.Callback() {
+            @Override
+            public void onFailure(okhttp3.Call call, IOException e) {
+                // Handle failure - fall back to straight line
+                runOnUiThread(() -> {
+                    drawStraightLine(origin, destination);
+                    Log.e("RouteDrawing", "Failed to get route: " + e.getMessage());
+                });
+            }
+
+            @Override
+            public void onResponse(okhttp3.Call call, okhttp3.Response response) throws IOException {
+                if (response.isSuccessful()) {
+                    try {
+                        String responseData = response.body().string();
+                        JSONObject jsonObject = new JSONObject(responseData);
+
+                        // Check if the route was found
+                        String status = jsonObject.getString("code");
+                        if ("Ok".equals(status)) {
+                            JSONArray routes = jsonObject.getJSONArray("routes");
+                            if (routes.length() > 0) {
+                                JSONObject route = routes.getJSONObject(0);
+                                String encodedPolyline = route.getString("geometry");
+
+                                // Get additional information
+                                double distance = route.getDouble("distance"); // in meters
+                                double duration = route.getDouble("duration"); // in seconds
+
+                                // Decode the polyline
+                                List<LatLng> decodedPath = decodePoly(encodedPolyline);
+
+                                // Update UI on the main thread
+                                runOnUiThread(() -> {
+                                    // Clear previous polylines but keep markers
+                                    if (mMap != null) {
+                                        // Remove only polylines, not markers
+                                        for (Polyline line : polylines) {
+                                            line.remove();
+                                        }
+                                        polylines.clear();
+
+                                        // Draw the polyline
+                                        PolylineOptions options = new PolylineOptions()
+                                                .addAll(decodedPath)
+                                                .width(10)
+                                                .color(Color.RED)
+                                                .geodesic(true);
+                                        polylines.add(mMap.addPolyline(options));
+
+                                        // Update ETA information
+                                        int minutes = (int)(duration / 60);
+                                        TextView etaTextView = findViewById(R.id.etaTextView);
+                                        if (etaTextView != null) {
+                                            etaTextView.setText("ETA: " + minutes + " min");
+                                            etaTextView.setVisibility(View.VISIBLE);
+                                        }
+
+                                        // Show all relevant points in the map view
+                                        LatLngBounds.Builder builder = new LatLngBounds.Builder();
+                                        builder.include(origin);
+                                        builder.include(destination);
+                                        for (LatLng point : decodedPath) {
+                                            builder.include(point);
+                                        }
+                                        LatLngBounds bounds = builder.build();
+
+                                        // Add padding to the bounds
+                                        int padding = 100; // offset from edges of the map in pixels
+                                        CameraUpdate cu = CameraUpdateFactory.newLatLngBounds(bounds, padding);
+                                        mMap.animateCamera(cu);
+                                    }
+                                });
+                            }
+                        } else {
+                            // No route found, fall back to straight line
+                            runOnUiThread(() -> {
+                                drawStraightLine(origin, destination);
+                            });
+                        }
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                        // Fall back to simple route on error
+                        runOnUiThread(() -> {
+                            drawStraightLine(origin, destination);
+                        });
+                    }
+                } else {
+                    // Handle unsuccessful response
+                    runOnUiThread(() -> {
+                        drawStraightLine(origin, destination);
                     });
                 }
             }
