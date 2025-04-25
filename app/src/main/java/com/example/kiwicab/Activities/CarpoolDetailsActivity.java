@@ -107,8 +107,11 @@ public class CarpoolDetailsActivity extends AppCompatActivity implements OnMapRe
 
         // Set click listeners
         chatBtn.setOnClickListener(v -> {
-            // Open chat activity
-            Toast.makeText(this, "Chat Coming Soon", Toast.LENGTH_SHORT).show();
+            // Open chat activity with carpool ID
+            Intent intent = new Intent(CarpoolDetailsActivity.this, ChatActivity.class);
+            intent.putExtra("carpoolId", carpoolId);
+            intent.putExtra("userName", mAuth.getCurrentUser().getDisplayName());
+            startActivity(intent);
         });
     }
 

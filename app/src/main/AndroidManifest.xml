@@ -21,6 +21,10 @@
         android:supportsRtl="true"
         android:theme="@style/SplashTheme">
         <activity
+            android:name=".Activities.ChatActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
+        <activity
             android:name=".Activities.CarpoolHomeActivity"
             android:exported="false" />
         <activity
