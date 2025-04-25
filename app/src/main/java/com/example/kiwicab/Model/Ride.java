@@ -13,10 +13,10 @@ public class Ride {
     private Boolean isPaid;
     private Boolean isRated;
 
-    private static final double BASE_FARE = 50.0; // Base fare in ₹
-    private static final double PRICE_PER_KM = 15.0; // ₹ per kilometer
-    private static final double PRICE_PER_MINUTE = 3.0; // ₹ per minute
-    private static final double BOOKING_FEE = 40.0; // Fixed booking fee
+    private static final double BASE_FARE = 40.0;
+    private static final double PRICE_PER_KM = 13.0;
+    private static final double PRICE_PER_MINUTE = 2.5;
+    private static final double BOOKING_FEE = 20.0;
 
     public Ride() {
         // Required empty constructor for Firebase
