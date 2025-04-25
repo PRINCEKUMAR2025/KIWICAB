@@ -1185,6 +1185,7 @@ public class CustomerHomeActivity extends AppCompatActivity implements OnMapRead
                 paymentData.put("amountPaid", amount);
                 paymentData.put("method", "Cash");
                 paymentData.put("timestamp", ServerValue.TIMESTAMP);
+                paymentData.put("rideID",rideId);
 
                 markPaymentComplete(rideId);
                 // Add completion listener to Firebase operation
