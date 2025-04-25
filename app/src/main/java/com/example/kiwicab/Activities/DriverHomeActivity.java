@@ -1194,6 +1194,11 @@ public class DriverHomeActivity extends AppCompatActivity implements OnMapReadyC
         }
     }
 
+    @Override
+    protected void onStop() {
+        super.onStop();
+        onlineDriversRef.child(driverId).removeValue();
+    }
 
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {

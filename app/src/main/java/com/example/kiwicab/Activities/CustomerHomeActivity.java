@@ -780,6 +780,7 @@ public class CustomerHomeActivity extends AppCompatActivity implements OnMapRead
                     onlineDriversRef.child(ride.getDriverId()).removeEventListener(driverLocationListener);
                     showNotification("Ride Completed", "Reached: "+destinationAddress);
                     driverLocationListener = null;
+                    mMap.clear();
                 }
 //                showPaymentDialog(currentRideId, ride.getFare());
                 SharedPreferences prefs = getSharedPreferences("ride_prefs", MODE_PRIVATE);
