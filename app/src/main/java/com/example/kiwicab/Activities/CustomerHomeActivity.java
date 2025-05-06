@@ -128,6 +128,10 @@ public class CustomerHomeActivity extends AppCompatActivity implements OnMapRead
     private boolean isPaymentDialogShowing = false;
     private MediaPlayer mediaPlayer;
 
+    private Handler blinkHandler = new Handler();
+    private Runnable blinkRunnable;
+    private boolean isVisible = true;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -416,6 +420,8 @@ public class CustomerHomeActivity extends AppCompatActivity implements OnMapRead
         // Create ride object
         Ride ride = new Ride(rideId, customerId, pickupLocationObj, destinationLocationObj, distanceInKm);
 
+        // Draw route from pickup to destination with blinking animation
+        drawRouteFromPickupToDestination(pickupLocation, destinationLocation);
         // Save to Firebase
         ridesRef.child(rideId).setValue(ride)
                 .addOnCompleteListener(new OnCompleteListener<Void>() {
@@ -471,6 +477,116 @@ public class CustomerHomeActivity extends AppCompatActivity implements OnMapRead
             }
         });
     }
+
+    private void drawRouteFromPickupToDestination(LatLng pickup, LatLng destination) {
+        // Build the OSRM API URL
+        String url = "https://router.project-osrm.org/route/v1/driving/" +
+                pickup.longitude + "," + pickup.latitude + ";" +
+                destination.longitude + "," + destination.latitude +
+                "?overview=full&geometries=polyline";
+
+        // Create OkHttp client
+        OkHttpClient client = new OkHttpClient();
+        Request request = new Request.Builder()
+                .url(url)
+                .build();
+
+        // Execute the request asynchronously
+        client.newCall(request).enqueue(new okhttp3.Callback() {
+            @Override
+            public void onFailure(okhttp3.Call call, IOException e) {
+                // Handle failure - fall back to straight line
+                runOnUiThread(() -> {
+                    drawStraightLine(pickup, destination);
+                    Log.e("RouteDrawing", "Failed to get route: " + e.getMessage());
+                });
+            }
+
+            @Override
+            public void onResponse(okhttp3.Call call, okhttp3.Response response) throws IOException {
+                if (response.isSuccessful()) {
+                    try {
+                        String responseData = response.body().string();
+                        JSONObject jsonObject = new JSONObject(responseData);
+
+                        // Check if the route was found
+                        String status = jsonObject.getString("code");
+                        if ("Ok".equals(status)) {
+                            JSONArray routes = jsonObject.getJSONArray("routes");
+                            if (routes.length() > 0) {
+                                JSONObject route = routes.getJSONObject(0);
+                                String encodedPolyline = route.getString("geometry");
+
+                                // Get additional information
+                                double distance = route.getDouble("distance"); // in meters
+                                double duration = route.getDouble("duration"); // in seconds
+
+                                // Decode the polyline
+                                List<LatLng> decodedPath = decodePoly(encodedPolyline);
+
+                                // Update UI on the main thread
+                                runOnUiThread(() -> {
+                                    // Clear previous polylines
+                                    for (Polyline line : polylines) {
+                                        line.remove();
+                                    }
+                                    polylines.clear();
+
+                                    // Draw the polyline with blinking animation
+                                    PolylineOptions options = new PolylineOptions()
+                                            .addAll(decodedPath)
+                                            .width(10)
+                                            .color(Color.GRAY)
+                                            .geodesic(true);
+                                    Polyline polyline = mMap.addPolyline(options);
+                                    polylines.add(polyline);
+
+                                    // Start blinking animation
+                                    startBlinkingAnimation(polyline);
+
+                                    // Update ETA information
+                                    int minutes = (int) (duration / 60);
+                                    TextView etaTextView = findViewById(R.id.etaTextView);
+                                    if (etaTextView != null) {
+                                        etaTextView.setText("ETA: " + minutes + " min");
+                                        etaTextView.setVisibility(View.VISIBLE);
+                                    }
+
+                                    // Show both markers in the map view
+                                    LatLngBounds.Builder builder = new LatLngBounds.Builder();
+                                    builder.include(pickup);
+                                    builder.include(destination);
+                                    LatLngBounds bounds = builder.build();
+
+                                    // Add padding to the bounds
+                                    int padding = 100; // offset from edges of the map in pixels
+                                    CameraUpdate cu = CameraUpdateFactory.newLatLngBounds(bounds, padding);
+                                    mMap.animateCamera(cu);
+                                });
+                            }
+                        } else {
+                            // No route found, fall back to straight line
+                            runOnUiThread(() -> {
+                                drawStraightLine(pickup, destination);
+                            });
+                        }
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                        // Fall back to simple route on error
+                        runOnUiThread(() -> {
+                            drawStraightLine(pickup, destination);
+                        });
+                    }
+                } else {
+                    // Handle unsuccessful response
+                    runOnUiThread(() -> {
+                        drawStraightLine(pickup, destination);
+                    });
+                }
+            }
+        });
+    }
+
 
 
     private void drawRouteFromDriverToCustomer(LatLng driverLocation, LatLng customerLocation) {
@@ -756,6 +872,36 @@ public class CustomerHomeActivity extends AppCompatActivity implements OnMapRead
         return poly;
     }
 
+    private void startBlinkingAnimation(final Polyline polyline) {
+        // Stop any existing animation
+        stopBlinkingAnimation();
+
+        blinkRunnable = new Runnable() {
+            @Override
+            public void run() {
+                if (polyline != null) {
+                    isVisible = !isVisible;
+                    polyline.setVisible(isVisible);
+                    blinkHandler.postDelayed(this, 600); // Blink every 500ms
+                }
+            }
+        };
+
+        blinkHandler.post(blinkRunnable);
+    }
+
+    private void stopBlinkingAnimation() {
+        if (blinkRunnable != null) {
+            blinkHandler.removeCallbacks(blinkRunnable);
+            blinkRunnable = null;
+        }
+
+        // Make sure all polylines are visible when stopping animation
+        for (Polyline line : polylines) {
+            line.setVisible(true);
+        }
+    }
+
     private void updateRideUI(Ride ride) {
         switch (ride.getStatus()) {
             case "requested":
@@ -764,6 +910,12 @@ public class CustomerHomeActivity extends AppCompatActivity implements OnMapRead
             case "accepted":
                 statusTextView.setText("Confirmed: Driver is coming to pick you up");
                 showNotification("Ride Accepted", "Driver is coming!");
+                // Stop blinking animation and clear the route
+                stopBlinkingAnimation();
+                for (Polyline line : polylines) {
+                    line.remove();
+                }
+                polylines.clear();
                 // Get driver details and show on UI
                 mediaPlayer =MediaPlayer.create(CustomerHomeActivity.this,R.raw.auto_horn);
                 mediaPlayer.start();
