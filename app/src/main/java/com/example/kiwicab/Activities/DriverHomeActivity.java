@@ -124,7 +124,7 @@ public class DriverHomeActivity extends AppCompatActivity implements OnMapReadyC
         // Set up toolbar
         Toolbar toolbar = findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
-        getSupportActionBar().setTitle("KIWICAB");
+        getSupportActionBar().setTitle("AutoCab");
 
         // Initialize Firebase
         mAuth = FirebaseAuth.getInstance();
