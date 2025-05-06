@@ -21,6 +21,7 @@ import android.graphics.Color;
 import android.location.Address;
 import android.location.Geocoder;
 
+import android.media.MediaPlayer;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -125,6 +126,7 @@ public class CustomerHomeActivity extends AppCompatActivity implements OnMapRead
     private boolean isCardExpanded = true;
     private List<Polyline> polylines = new ArrayList<>();
     private boolean isPaymentDialogShowing = false;
+    private MediaPlayer mediaPlayer;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -549,7 +551,7 @@ public class CustomerHomeActivity extends AppCompatActivity implements OnMapRead
                                         PolylineOptions options = new PolylineOptions()
                                                 .addAll(decodedPath)
                                                 .width(10)
-                                                .color(Color.BLUE)
+                                                .color(Color.YELLOW)
                                                 .geodesic(true);
                                         mMap.addPolyline(options);
 
@@ -645,7 +647,7 @@ public class CustomerHomeActivity extends AppCompatActivity implements OnMapRead
                                         PolylineOptions options = new PolylineOptions()
                                                 .addAll(decodedPath)
                                                 .width(10)
-                                                .color(Color.RED)
+                                                .color(Color.GREEN)
                                                 .geodesic(true);
                                         polylines.add(mMap.addPolyline(options));
 
@@ -763,6 +765,8 @@ public class CustomerHomeActivity extends AppCompatActivity implements OnMapRead
                 statusTextView.setText("Confirmed: Driver is coming to pick you up");
                 showNotification("Ride Accepted", "Driver is coming!");
                 // Get driver details and show on UI
+                mediaPlayer =MediaPlayer.create(CustomerHomeActivity.this,R.raw.auto_horn);
+                mediaPlayer.start();
                 getDriverDetails(ride.getDriverId());
                 if (ride.getDriverId() != null) {
                     trackDriverLocation(ride.getDriverId());
@@ -1378,6 +1382,14 @@ public class CustomerHomeActivity extends AppCompatActivity implements OnMapRead
     @Override
     protected void onDestroy() {
         super.onDestroy();
+//Release MediapLayer
+        if (mediaPlayer != null) {
+            if (mediaPlayer.isPlaying()) {
+                mediaPlayer.stop();
+            }
+            mediaPlayer.release();
+            mediaPlayer = null;
+        }
 
         // Remove driver location listener if it exists
         if (driverLocationListener != null && currentRideId != null) {

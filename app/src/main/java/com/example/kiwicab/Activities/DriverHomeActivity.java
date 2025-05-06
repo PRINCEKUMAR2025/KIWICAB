@@ -714,7 +714,7 @@ public class DriverHomeActivity extends AppCompatActivity implements OnMapReadyC
         mMap.animateCamera(CameraUpdateFactory.newLatLngBounds(bounds, 100));
 
         // Draw route from driver to pickup
-        drawRoute(driverLocation, pickupLatLng, Color.BLUE);
+        drawRoute(driverLocation, pickupLatLng, Color.YELLOW);
     }
 
     private void drawRoute(LatLng origin, LatLng destination, int color) {
@@ -986,7 +986,7 @@ public class DriverHomeActivity extends AppCompatActivity implements OnMapReadyC
                             mMap.animateCamera(CameraUpdateFactory.newLatLngBounds(bounds, 100));
 
                             // Draw route to destination
-                            drawRoute(driverLocation, destinationLatLng, Color.RED);
+                            drawRoute(driverLocation, destinationLatLng, Color.GREEN);
                         }
                     }
                 }

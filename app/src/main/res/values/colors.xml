@@ -2,12 +2,16 @@
 <resources>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
-        <color name="colorPrimary">#2196F3</color>
-        <color name="colorPrimaryDark">#1976D2</color>
-        <color name="colorAccent">#03A9F4</color>
-        <color name="colorSuccess">#4CAF50</color>
-        <color name="colorError">#F44336</color>
-        <color name="colorWarning">#FFC107</color>
 
+    <!-- Primary green (used widely in autorickshaws) -->
+    <color name="colorPrimary">#2E7D32</color> <!-- Dark green -->
+    <color name="colorPrimaryDark">#1B5E20</color> <!-- Deeper green -->
 
+    <!-- Accent yellow (roof or highlights in autorickshaws) -->
+    <color name="colorAccent">#FDD835</color> <!-- Bright yellow -->
+
+    <!-- Optional semantic colors aligned with theme -->
+    <color name="colorSuccess">#388E3C</color> <!-- Positive action green -->
+    <color name="colorError">#C62828</color> <!-- Keep red for errors -->
+    <color name="colorWarning">#FFEB3B</color> <!-- Warning yellow -->
 </resources>
