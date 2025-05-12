@@ -102,7 +102,7 @@ public class FindCarpoolActivity extends AppCompatActivity {
                 for (DataSnapshot carpoolSnapshot : snapshot.getChildren()) {
                     Carpool carpool = carpoolSnapshot.getValue(Carpool.class);
 
-                    if (carpool != null && carpool.getPassengerCount() < 4) {
+                    if (carpool != null && carpool.getPassengerCount() < 3) {
                         // Check if user is not already in this carpool
                         if (carpool.getPassengers() == null || !carpool.getPassengers().containsKey(userId)) {
                             carpoolList.add(carpool);
@@ -148,7 +148,7 @@ public class FindCarpoolActivity extends AppCompatActivity {
                 for (DataSnapshot carpoolSnapshot : snapshot.getChildren()) {
                     Carpool carpool = carpoolSnapshot.getValue(Carpool.class);
 
-                    if (carpool != null && carpool.getPassengerCount() < 4) {
+                    if (carpool != null && carpool.getPassengerCount() < 3) {
                         // Check if destination matches (case insensitive)
                         String carpoolDestination = carpool.getDestinationLocation().getAddress().toLowerCase();
                         if (carpoolDestination.contains(destination.toLowerCase())) {
@@ -204,7 +204,7 @@ public class FindCarpoolActivity extends AppCompatActivity {
             holder.destinationTextView.setText(carpool.getDestinationLocation().getAddress());
             holder.fareTextView.setText(String.format("₹%.2f", carpool.getFare()));
             holder.timeTextView.setText(carpool.getDepartureTime());
-            holder.seatsTextView.setText(String.format("%d/4 seats", carpool.getPassengerCount()));
+            holder.seatsTextView.setText(String.format("%d/3 seats", carpool.getPassengerCount()));
 
             // Get driver details
             DatabaseReference userRef = FirebaseDatabase.getInstance().getReference()
@@ -273,7 +273,7 @@ public class FindCarpoolActivity extends AppCompatActivity {
                     if (carpool != null) {
                         int passengerCount = carpool.getPassengerCount();
 
-                        if (passengerCount < 4) {
+                        if (passengerCount < 3) {
                             // Add user to passengers
                             carpoolsRef.child(carpoolId).child("passengers").child(userId).setValue(true);
 
@@ -281,7 +281,7 @@ public class FindCarpoolActivity extends AppCompatActivity {
                             carpoolsRef.child(carpoolId).child("passengerCount").setValue(passengerCount + 1);
 
                             // Check if carpool is now full
-                            if (passengerCount + 1 >= 4) {
+                            if (passengerCount + 1 >= 3) {
                                 carpoolsRef.child(carpoolId).child("isFull").setValue(true);
                             }
 

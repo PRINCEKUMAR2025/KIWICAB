@@ -169,7 +169,7 @@ public class CarpoolDetailsActivity extends AppCompatActivity implements OnMapRe
         fareTextView.setText(String.format("₹%.2f", carpool.getFare()));
         vehicleInfoTextView.setText(carpool.getVehicleInformation().toString());
         timeTextView.setText(carpool.getDepartureTime());
-        seatsTextView.setText(String.format("%d/4 seats", carpool.getPassengerCount()));
+        seatsTextView.setText(String.format("%d/3 seats", carpool.getPassengerCount()));
 
 
         // Set action button based on user role
@@ -187,7 +187,7 @@ public class CarpoolDetailsActivity extends AppCompatActivity implements OnMapRe
             });
         } else {
             // User is not part of the carpool
-            if (carpool.getPassengerCount() < 4) {
+            if (carpool.getPassengerCount() < 3) {
                 actionBtn.setText("Join Carpool");
                 actionBtn.setOnClickListener(v -> {
                     joinCarpool();
@@ -388,7 +388,7 @@ public class CarpoolDetailsActivity extends AppCompatActivity implements OnMapRe
                     if (carpool != null) {
                         int passengerCount = carpool.getPassengerCount();
 
-                        if (passengerCount < 4) {
+                        if (passengerCount < 3) {
                             // Add user to passengers
                             carpoolsRef.child(carpoolId).child("passengers").child(userId).setValue(true);
 
@@ -396,7 +396,7 @@ public class CarpoolDetailsActivity extends AppCompatActivity implements OnMapRe
                             carpoolsRef.child(carpoolId).child("passengerCount").setValue(passengerCount + 1);
 
                             // Check if carpool is now full
-                            if (passengerCount + 1 >= 4) {
+                            if (passengerCount + 1 >= 3) {
                                 carpoolsRef.child(carpoolId).child("isFull").setValue(true);
                             }
 
