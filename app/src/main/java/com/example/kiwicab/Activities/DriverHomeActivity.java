@@ -18,6 +18,7 @@ import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.location.Location;
+import android.media.MediaPlayer;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Looper;
@@ -115,6 +116,7 @@ public class DriverHomeActivity extends AppCompatActivity implements OnMapReadyC
 
     private DatabaseReference carpoolsRef;
     private ValueEventListener carpoolRequestListener;
+    MediaPlayer mediaPlayer;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -596,8 +598,8 @@ public class DriverHomeActivity extends AppCompatActivity implements OnMapReadyC
 
                                             float distanceInKm = results[0] / 1000;
 
-                                            // Only show requests within 25km
-                                            if (distanceInKm <= 15) {
+                                            // Only show requests within 10km
+                                            if (distanceInKm <= 10) {
                                                 // Show ride request
                                                 showRideRequest(ride);
                                             }
@@ -649,6 +651,9 @@ public class DriverHomeActivity extends AppCompatActivity implements OnMapReadyC
                         // Show ride request card
                         rideRequestCard.setVisibility(View.VISIBLE);
                         acceptRideBtn.setVisibility(View.VISIBLE);
+                        //Audio Request
+                        mediaPlayer = MediaPlayer.create(DriverHomeActivity.this,R.raw.auto_horn);
+                        mediaPlayer.start();
 
                         // Set customer details
                         customerNameTextView.setText(customer.getName());
