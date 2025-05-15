@@ -497,19 +497,45 @@ public class DriverHomeActivity extends AppCompatActivity implements OnMapReadyC
                 rideRequestListener = null;
             }
         } else {
-            // Go online
-            isAvailable = true;
-            availabilitySwitch.setChecked(true);
-            goOnlineBtn.setText("Go Offline");
-            statusTextView.setText("You are online and available for rides");
+            // Check isVerified before allowing to go online
+            driversRef.child(driverId).child("isVerified").addListenerForSingleValueEvent(new ValueEventListener() {
+                @Override
+                public void onDataChange(@NonNull DataSnapshot snapshot) {
+                    Boolean isVerified = snapshot.getValue(Boolean.class);
+                    if (isVerified != null && isVerified) {
+                        // Go online
+                        isAvailable = true;
+                        availabilitySwitch.setChecked(true);
+                        goOnlineBtn.setText("Go Offline");
+                        statusTextView.setText("You are online and available for rides");
 
-            // Update driver location
-            updateDriverLocation();
+                        // Update driver location
+                        updateDriverLocation();
 
-            // Listen for ride requests
-            listenForRideRequests();
+                        // Listen for ride requests
+                        listenForRideRequests();
+                    } else {
+                        Toast.makeText(DriverHomeActivity.this,
+                                "Your account is not verified. You cannot go online.",
+                                Toast.LENGTH_LONG).show();
+                        // Ensure UI stays offline
+                        isAvailable = false;
+                        availabilitySwitch.setChecked(false);
+                        goOnlineBtn.setText("Go Online");
+                        statusTextView.setText("You are currently offline");
+                    }
+                }
+
+                @Override
+                public void onCancelled(@NonNull DatabaseError error) {
+                    Toast.makeText(DriverHomeActivity.this,
+                            "Database error: " + error.getMessage(),
+                            Toast.LENGTH_SHORT).show();
+                }
+            });
         }
     }
+
 
     private void updateDriverLocation() {
         if (driverLocation != null) {
