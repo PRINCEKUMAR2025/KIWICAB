@@ -1,5 +1,7 @@
 package com.example.kiwicab.Model;
 
+import java.util.List;
+
 public class User {
     private String id;
     private String name;
@@ -9,6 +11,43 @@ public class User {
     private float rating;
     private String currentRideId;
     private String profileImageUrl;
+
+    private List<EmergencyContact> emergencyContacts;
+    // Add getter and setter for emergency contacts
+    public List<EmergencyContact> getEmergencyContacts() {
+        return emergencyContacts;
+    }
+
+    public void setEmergencyContacts(List<EmergencyContact> emergencyContacts) {
+        this.emergencyContacts = emergencyContacts;
+    }
+
+    // Inner class for Emergency Contact
+    public static class EmergencyContact {
+        private String name;
+        private String phone;
+        private String email;
+        private String relationship;
+
+        public EmergencyContact() {} // Required for Firebase
+
+        public EmergencyContact(String name, String phone, String email, String relationship) {
+            this.name = name;
+            this.phone = phone;
+            this.email = email;
+            this.relationship = relationship;
+        }
+
+        // Getters and setters
+        public String getName() { return name; }
+        public void setName(String name) { this.name = name; }
+        public String getPhone() { return phone; }
+        public void setPhone(String phone) { this.phone = phone; }
+        public String getEmail() { return email; }
+        public void setEmail(String email) { this.email = email; }
+        public String getRelationship() { return relationship; }
+        public void setRelationship(String relationship) { this.relationship = relationship; }
+    }
 
     // Constructor, getters, and setters
     public User() {

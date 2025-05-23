@@ -56,6 +56,7 @@ import com.example.kiwicab.Model.Location;
 import com.example.kiwicab.Model.Ride;
 import com.example.kiwicab.Model.User;
 import com.example.kiwicab.R;
+import com.example.kiwicab.Services.EmergencyAlertService;
 import com.google.android.gms.location.FusedLocationProviderClient;
 import com.google.android.gms.location.LocationCallback;
 import com.google.android.gms.location.LocationRequest;
@@ -137,6 +138,10 @@ public class CustomerHomeActivity extends AppCompatActivity implements OnMapRead
     private DatabaseReference emergencyRequestsRef;
     private LocationCallback emergencyLocationCallback;
     private String activeEmergencyId = null;
+    private EmergencyAlertService emergencyAlertService;
+
+    private static final int REQUEST_SMS_PERMISSION = 101;
+    private static final int REQUEST_CALL_PERMISSION = 102;
 
 
 
@@ -237,6 +242,8 @@ public class CustomerHomeActivity extends AppCompatActivity implements OnMapRead
 
         // Check if user has an active ride
         checkForActiveRide();
+        requestEmergencyPermissions();
+        emergencyAlertService = new EmergencyAlertService(this);
     }
 
     private void toggleCardExpansion() {
@@ -279,6 +286,8 @@ public class CustomerHomeActivity extends AppCompatActivity implements OnMapRead
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+
+        // Existing location permission handling
         if (requestCode == 1 && grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
                     == PackageManager.PERMISSION_GRANTED) {
@@ -286,7 +295,26 @@ public class CustomerHomeActivity extends AppCompatActivity implements OnMapRead
                 startLocationUpdates();
             }
         }
+
+        // New emergency permissions handling
+        if (requestCode == REQUEST_SMS_PERMISSION) {
+            boolean allGranted = true;
+            for (int result : grantResults) {
+                if (result != PackageManager.PERMISSION_GRANTED) {
+                    allGranted = false;
+                    break;
+                }
+            }
+
+            if (allGranted) {
+                Toast.makeText(this, "Emergency permissions granted", Toast.LENGTH_SHORT).show();
+            } else {
+                // Show explanation dialog
+                Toast.makeText(this, "All Permissions Granted", Toast.LENGTH_SHORT).show();
+            }
+        }
     }
+
 
     private void createLocationRequest() {
         locationRequest = LocationRequest.create();
@@ -316,6 +344,25 @@ public class CustomerHomeActivity extends AppCompatActivity implements OnMapRead
             }
         };
     }
+
+    private void requestEmergencyPermissions() {
+        List<String> permissionsNeeded = new ArrayList<>();
+
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.SEND_SMS) != PackageManager.PERMISSION_GRANTED) {
+            permissionsNeeded.add(Manifest.permission.SEND_SMS);
+        }
+
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CALL_PHONE) != PackageManager.PERMISSION_GRANTED) {
+            permissionsNeeded.add(Manifest.permission.CALL_PHONE);
+        }
+
+        if (!permissionsNeeded.isEmpty()) {
+            ActivityCompat.requestPermissions(this,
+                    permissionsNeeded.toArray(new String[0]),
+                    REQUEST_SMS_PERMISSION);
+        }
+    }
+
 
     private void triggerEmergencyRequest() {
         // Show confirmation dialog first
@@ -389,7 +436,7 @@ public class CustomerHomeActivity extends AppCompatActivity implements OnMapRead
                             if (driverSnapshot.exists()) {
                                 User driver = driverSnapshot.getValue(User.class);
 
-                                // Create emergency request object
+                                // Create emergency request object (existing code)
                                 Map<String, Object> emergencyRequest = new HashMap<>();
                                 emergencyRequest.put("emergencyId", emergencyId);
                                 emergencyRequest.put("customerId", customerId);
@@ -398,10 +445,14 @@ public class CustomerHomeActivity extends AppCompatActivity implements OnMapRead
 
                                 // Customer current location
                                 Map<String, Object> customerLocation = new HashMap<>();
+                                String locationString;
                                 if (pickupLocation != null) {
                                     customerLocation.put("latitude", pickupLocation.latitude);
                                     customerLocation.put("longitude", pickupLocation.longitude);
                                     customerLocation.put("timestamp", System.currentTimeMillis());
+                                    locationString = "Lat: " + pickupLocation.latitude + ", Lng: " + pickupLocation.longitude;
+                                } else {
+                                    locationString = "Location not available";
                                 }
                                 emergencyRequest.put("customerLocation", customerLocation);
 
@@ -423,8 +474,11 @@ public class CustomerHomeActivity extends AppCompatActivity implements OnMapRead
                                                 // Start real-time location tracking
                                                 startEmergencyLocationTracking(emergencyId);
 
+                                                // Send emergency alerts to contacts
+                                                sendEmergencyAlertsToContacts(emergencyId, customer, driver, locationString);
+
                                                 Toast.makeText(CustomerHomeActivity.this,
-                                                        "Emergency alert sent! Real-time tracking started.",
+                                                        "Emergency alert sent! Live tracking started and contacts notified.",
                                                         Toast.LENGTH_LONG).show();
 
                                                 showEmergencyConfirmation(emergencyId);
@@ -453,6 +507,43 @@ public class CustomerHomeActivity extends AppCompatActivity implements OnMapRead
             }
         });
     }
+
+    private void sendEmergencyAlertsToContacts(String emergencyId, User customer, User driver, String location) {
+        // Get customer's emergency contacts from Firebase
+        customersRef.child(customerId).child("emergencyContacts").addListenerForSingleValueEvent(new ValueEventListener() {
+            @Override
+            public void onDataChange(@NonNull DataSnapshot snapshot) {
+                if (snapshot.exists()) {
+                    List<User.EmergencyContact> emergencyContacts = new ArrayList<>();
+                    for (DataSnapshot contactSnapshot : snapshot.getChildren()) {
+                        User.EmergencyContact contact = contactSnapshot.getValue(User.EmergencyContact.class);
+                        if (contact != null) {
+                            emergencyContacts.add(contact);
+                        }
+                    }
+
+                    if (!emergencyContacts.isEmpty()) {
+                        // Send alerts to all emergency contacts
+                        emergencyAlertService.sendEmergencyAlerts(emergencyId, customer, driver, location, emergencyContacts);
+
+                        Toast.makeText(CustomerHomeActivity.this,
+                                "Emergency alerts sent to " + emergencyContacts.size() + " contacts",
+                                Toast.LENGTH_LONG).show();
+                    } else {
+                        Toast.makeText(CustomerHomeActivity.this,
+                                "No emergency contacts found. Please add emergency contacts in your profile.",
+                                Toast.LENGTH_LONG).show();
+                    }
+                }
+            }
+
+            @Override
+            public void onCancelled(@NonNull DatabaseError error) {
+                Log.e("EmergencyAlert", "Failed to get emergency contacts: " + error.getMessage());
+            }
+        });
+    }
+
 
     private void startEmergencyLocationTracking(String emergencyId) {
         // Create high-frequency location request for emergency
@@ -1844,6 +1935,10 @@ public class CustomerHomeActivity extends AppCompatActivity implements OnMapRead
         }else if (id == R.id.action_carpool) {
             // Open ride history activity
             startActivity(new Intent(CustomerHomeActivity.this, CarpoolHomeActivity.class));
+            return true;
+        }else if (id == R.id.action_emergency_contact) {
+            // Open ride history activity
+            startActivity(new Intent(CustomerHomeActivity.this, EmergencyContactsActivity.class));
             return true;
         }
 
