@@ -133,9 +133,11 @@ public class CustomerHomeActivity extends AppCompatActivity implements OnMapRead
     private Handler blinkHandler = new Handler();
     private Runnable blinkRunnable;
     private boolean isVisible = true;
-
     private FloatingActionButton emergencyBtn;
     private DatabaseReference emergencyRequestsRef;
+    private LocationCallback emergencyLocationCallback;
+    private String activeEmergencyId = null;
+
 
 
     @Override
@@ -182,6 +184,7 @@ public class CustomerHomeActivity extends AppCompatActivity implements OnMapRead
                 triggerEmergencyRequest();
             }
         });
+
 
 
         // Initially hide ride details card
@@ -318,7 +321,7 @@ public class CustomerHomeActivity extends AppCompatActivity implements OnMapRead
         // Show confirmation dialog first
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
         builder.setTitle("Emergency Alert")
-                .setMessage("Are you sure you want to send an emergency alert? This will notify authorities and your emergency contacts.")
+                .setMessage("Are you sure you want to send an emergency alert? This will notify authorities.")
                 .setPositiveButton("YES, SEND ALERT", new DialogInterface.OnClickListener() {
                     @Override
                     public void onClick(DialogInterface dialog, int which) {
@@ -349,65 +352,7 @@ public class CustomerHomeActivity extends AppCompatActivity implements OnMapRead
                 if (snapshot.exists()) {
                     Ride ride = snapshot.getValue(Ride.class);
                     if (ride != null && ride.getDriverId() != null) {
-                        // Get customer details
-                        customersRef.child(customerId).addListenerForSingleValueEvent(new ValueEventListener() {
-                            @Override
-                            public void onDataChange(@NonNull DataSnapshot customerSnapshot) {
-                                if (customerSnapshot.exists()) {
-                                    User customer = customerSnapshot.getValue(User.class);
-
-                                    // Get driver details
-                                    driversRef.child(ride.getDriverId()).addListenerForSingleValueEvent(new ValueEventListener() {
-                                        @Override
-                                        public void onDataChange(@NonNull DataSnapshot driverSnapshot) {
-                                            if (driverSnapshot.exists()) {
-                                                User driver = driverSnapshot.getValue(User.class);
-
-                                                // Get driver's current location
-                                                onlineDriversRef.child(ride.getDriverId()).addListenerForSingleValueEvent(new ValueEventListener() {
-                                                    @Override
-                                                    public void onDataChange(@NonNull DataSnapshot locationSnapshot) {
-                                                        Double driverLat = null;
-                                                        Double driverLng = null;
-
-                                                        if (locationSnapshot.exists()) {
-                                                            driverLat = locationSnapshot.child("latitude").getValue(Double.class);
-                                                            driverLng = locationSnapshot.child("longitude").getValue(Double.class);
-                                                        }
-
-                                                        // Create emergency request
-                                                        createEmergencyRequest(customer, driver, ride, driverLat, driverLng, progressDialog);
-                                                    }
-
-                                                    @Override
-                                                    public void onCancelled(@NonNull DatabaseError error) {
-                                                        createEmergencyRequest(customer, driver, ride, null, null, progressDialog);
-                                                    }
-                                                });
-                                            } else {
-                                                progressDialog.dismiss();
-                                                Toast.makeText(CustomerHomeActivity.this, "Driver details not found", Toast.LENGTH_SHORT).show();
-                                            }
-                                        }
-
-                                        @Override
-                                        public void onCancelled(@NonNull DatabaseError error) {
-                                            progressDialog.dismiss();
-                                            Toast.makeText(CustomerHomeActivity.this, "Error getting driver details", Toast.LENGTH_SHORT).show();
-                                        }
-                                    });
-                                } else {
-                                    progressDialog.dismiss();
-                                    Toast.makeText(CustomerHomeActivity.this, "Customer details not found", Toast.LENGTH_SHORT).show();
-                                }
-                            }
-
-                            @Override
-                            public void onCancelled(@NonNull DatabaseError error) {
-                                progressDialog.dismiss();
-                                Toast.makeText(CustomerHomeActivity.this, "Error getting customer details", Toast.LENGTH_SHORT).show();
-                            }
-                        });
+                        createEmergencyRequest(ride, progressDialog);
                     } else {
                         progressDialog.dismiss();
                         Toast.makeText(CustomerHomeActivity.this, "No driver assigned to this ride", Toast.LENGTH_SHORT).show();
@@ -421,86 +366,136 @@ public class CustomerHomeActivity extends AppCompatActivity implements OnMapRead
             @Override
             public void onCancelled(@NonNull DatabaseError error) {
                 progressDialog.dismiss();
-                Toast.makeText(CustomerHomeActivity.this, "Error getting ride details", Toast.LENGTH_SHORT).show();
+                Toast.makeText(CustomerHomeActivity.this, "Error: " + error.getMessage(), Toast.LENGTH_SHORT).show();
             }
         });
     }
 
-    private void createEmergencyRequest(User customer, User driver, Ride ride, Double driverLat, Double driverLng, ProgressDialog progressDialog) {
+    private void createEmergencyRequest(Ride ride, ProgressDialog progressDialog) {
         String emergencyId = emergencyRequestsRef.push().getKey();
+        activeEmergencyId = emergencyId;
 
-        // Create emergency request object
-        Map<String, Object> emergencyRequest = new HashMap<>();
-        emergencyRequest.put("emergencyId", emergencyId);
-        emergencyRequest.put("customerId", customerId);
-        emergencyRequest.put("customerName", customer.getName());
-        emergencyRequest.put("customerPhone", customer.getPhone());
+        // Get customer details
+        customersRef.child(customerId).addListenerForSingleValueEvent(new ValueEventListener() {
+            @Override
+            public void onDataChange(@NonNull DataSnapshot customerSnapshot) {
+                if (customerSnapshot.exists()) {
+                    User customer = customerSnapshot.getValue(User.class);
 
-        // Customer current location
-        Map<String, Object> customerLocation = new HashMap<>();
-        if (pickupLocation != null) {
-            customerLocation.put("latitude", pickupLocation.latitude);
-            customerLocation.put("longitude", pickupLocation.longitude);
-            // Get address from location
-            getAddressFromLatLng(pickupLocation, address -> {
-                customerLocation.put("address", address);
-            });
-        }
-        emergencyRequest.put("customerLocation", customerLocation);
+                    // Get driver details
+                    driversRef.child(ride.getDriverId()).addListenerForSingleValueEvent(new ValueEventListener() {
+                        @Override
+                        public void onDataChange(@NonNull DataSnapshot driverSnapshot) {
+                            if (driverSnapshot.exists()) {
+                                User driver = driverSnapshot.getValue(User.class);
 
-        // Driver details
-        emergencyRequest.put("driverId", ride.getDriverId());
-        emergencyRequest.put("driverName", driver.getName());
-        emergencyRequest.put("driverPhone", driver.getPhone());
+                                // Create emergency request object
+                                Map<String, Object> emergencyRequest = new HashMap<>();
+                                emergencyRequest.put("emergencyId", emergencyId);
+                                emergencyRequest.put("customerId", customerId);
+                                emergencyRequest.put("customerName", customer.getName());
+                                emergencyRequest.put("customerPhone", customer.getPhone());
 
-        // Driver location
-        if (driverLat != null && driverLng != null) {
-            Map<String, Object> driverLocation = new HashMap<>();
-            driverLocation.put("latitude", driverLat);
-            driverLocation.put("longitude", driverLng);
-            emergencyRequest.put("driverLocation", driverLocation);
-        }
+                                // Customer current location
+                                Map<String, Object> customerLocation = new HashMap<>();
+                                if (pickupLocation != null) {
+                                    customerLocation.put("latitude", pickupLocation.latitude);
+                                    customerLocation.put("longitude", pickupLocation.longitude);
+                                    customerLocation.put("timestamp", System.currentTimeMillis());
+                                }
+                                emergencyRequest.put("customerLocation", customerLocation);
 
-        // Additional details
-        emergencyRequest.put("rideId", currentRideId);
-        emergencyRequest.put("timestamp", System.currentTimeMillis());
-        emergencyRequest.put("status", "active");
+                                // Driver details
+                                emergencyRequest.put("driverId", ride.getDriverId());
+                                emergencyRequest.put("driverName", driver.getName());
+                                emergencyRequest.put("driverPhone", driver.getPhone());
 
-        // Save to Firebase
-        emergencyRequestsRef.child(emergencyId).setValue(emergencyRequest)
-                .addOnCompleteListener(task -> {
-                    progressDialog.dismiss();
-                    if (task.isSuccessful()) {
-                        Toast.makeText(CustomerHomeActivity.this,
-                                "Emergency alert sent successfully! Help is on the way.",
-                                Toast.LENGTH_LONG).show();
+                                // Additional details
+                                emergencyRequest.put("rideId", currentRideId);
+                                emergencyRequest.put("timestamp", System.currentTimeMillis());
+                                emergencyRequest.put("status", "active");
 
-                        // Show emergency confirmation dialog
-                        showEmergencyConfirmation(emergencyId);
-                    } else {
-                        Toast.makeText(CustomerHomeActivity.this,
-                                "Failed to send emergency alert: " + task.getException().getMessage(),
-                                Toast.LENGTH_LONG).show();
-                    }
-                });
-    }
+                                // Save to Firebase
+                                emergencyRequestsRef.child(emergencyId).setValue(emergencyRequest)
+                                        .addOnCompleteListener(task -> {
+                                            progressDialog.dismiss();
+                                            if (task.isSuccessful()) {
+                                                // Start real-time location tracking
+                                                startEmergencyLocationTracking(emergencyId);
 
-    private void getAddressFromLatLng(LatLng latLng, AddressCallback callback) {
-        Geocoder geocoder = new Geocoder(this, Locale.getDefault());
-        try {
-            List<Address> addresses = geocoder.getFromLocation(latLng.latitude, latLng.longitude, 1);
-            if (addresses != null && !addresses.isEmpty()) {
-                callback.onAddressReceived(addresses.get(0).getAddressLine(0));
-            } else {
-                callback.onAddressReceived("Address not found");
+                                                Toast.makeText(CustomerHomeActivity.this,
+                                                        "Emergency alert sent! Real-time tracking started.",
+                                                        Toast.LENGTH_LONG).show();
+
+                                                showEmergencyConfirmation(emergencyId);
+                                            } else {
+                                                Toast.makeText(CustomerHomeActivity.this,
+                                                        "Failed to send emergency alert",
+                                                        Toast.LENGTH_LONG).show();
+                                            }
+                                        });
+                            }
+                        }
+
+                        @Override
+                        public void onCancelled(@NonNull DatabaseError error) {
+                            progressDialog.dismiss();
+                            Toast.makeText(CustomerHomeActivity.this, "Error getting driver details", Toast.LENGTH_SHORT).show();
+                        }
+                    });
+                }
             }
-        } catch (IOException e) {
-            callback.onAddressReceived("Unable to get address");
-        }
+
+            @Override
+            public void onCancelled(@NonNull DatabaseError error) {
+                progressDialog.dismiss();
+                Toast.makeText(CustomerHomeActivity.this, "Error getting customer details", Toast.LENGTH_SHORT).show();
+            }
+        });
     }
 
-    interface AddressCallback {
-        void onAddressReceived(String address);
+    private void startEmergencyLocationTracking(String emergencyId) {
+        // Create high-frequency location request for emergency
+        LocationRequest emergencyLocationRequest = LocationRequest.create();
+        emergencyLocationRequest.setInterval(3000); // 3 seconds for emergency
+        emergencyLocationRequest.setFastestInterval(1000); // 1 second
+        emergencyLocationRequest.setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY);
+
+        emergencyLocationCallback = new LocationCallback() {
+            @Override
+            public void onLocationResult(LocationResult locationResult) {
+                if (locationResult != null && activeEmergencyId != null) {
+                    for (android.location.Location location : locationResult.getLocations()) {
+                        // Update customer location in emergency request
+                        Map<String, Object> locationUpdate = new HashMap<>();
+                        locationUpdate.put("latitude", location.getLatitude());
+                        locationUpdate.put("longitude", location.getLongitude());
+                        locationUpdate.put("timestamp", System.currentTimeMillis());
+                        locationUpdate.put("accuracy", location.getAccuracy());
+                        locationUpdate.put("speed", location.getSpeed());
+
+                        emergencyRequestsRef.child(emergencyId)
+                                .child("customerLocation")
+                                .setValue(locationUpdate);
+
+                        Log.d("EmergencyTracking", "Location updated: " + location.getLatitude() + ", " + location.getLongitude());
+                    }
+                }
+            }
+        };
+
+        // Start location updates
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+            fusedLocationClient.requestLocationUpdates(emergencyLocationRequest, emergencyLocationCallback, Looper.getMainLooper());
+
+            // Store emergency ID in SharedPreferences
+            SharedPreferences prefs = getSharedPreferences("emergency_prefs", MODE_PRIVATE);
+            SharedPreferences.Editor editor = prefs.edit();
+            editor.putString("active_emergency_id", emergencyId);
+            editor.apply();
+
+            Log.d("EmergencyTracking", "Started emergency location tracking for: " + emergencyId);
+        }
     }
 
     private void showEmergencyConfirmation(String emergencyId) {
@@ -508,12 +503,29 @@ public class CustomerHomeActivity extends AppCompatActivity implements OnMapRead
         builder.setTitle("Emergency Alert Sent")
                 .setMessage("Your emergency alert has been sent successfully.\n\n" +
                         "Emergency ID: " + emergencyId + "\n\n" +
-                        "Authorities and your emergency contacts have been notified. " +
-                        "Stay calm and wait for help to arrive.")
+                        "Real-time location tracking is now active. " +
+                        "Authorities can track your location in the admin panel.")
                 .setPositiveButton("OK", null)
                 .setCancelable(false)
                 .show();
     }
+
+    private void stopEmergencyLocationTracking() {
+        if (emergencyLocationCallback != null) {
+            fusedLocationClient.removeLocationUpdates(emergencyLocationCallback);
+            emergencyLocationCallback = null;
+            activeEmergencyId = null;
+
+            // Clear from SharedPreferences
+            SharedPreferences prefs = getSharedPreferences("emergency_prefs", MODE_PRIVATE);
+            SharedPreferences.Editor editor = prefs.edit();
+            editor.remove("active_emergency_id");
+            editor.apply();
+
+            Log.d("EmergencyTracking", "Stopped emergency location tracking");
+        }
+    }
+
 
 
     private void startLocationUpdates() {
@@ -1756,6 +1768,8 @@ public class CustomerHomeActivity extends AppCompatActivity implements OnMapRead
     @Override
     protected void onDestroy() {
         super.onDestroy();
+
+        stopEmergencyLocationTracking();
 //Release MediapLayer
         if (mediaPlayer != null) {
             if (mediaPlayer.isPlaying()) {
