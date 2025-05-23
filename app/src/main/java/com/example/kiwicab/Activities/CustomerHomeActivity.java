@@ -54,6 +54,7 @@ import com.bumptech.glide.Glide;
 import com.example.kiwicab.Model.Driver;
 import com.example.kiwicab.Model.Location;
 import com.example.kiwicab.Model.Ride;
+import com.example.kiwicab.Model.User;
 import com.example.kiwicab.R;
 import com.google.android.gms.location.FusedLocationProviderClient;
 import com.google.android.gms.location.LocationCallback;
@@ -75,6 +76,7 @@ import com.google.android.gms.maps.model.PolylineOptions;
 import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.OnSuccessListener;
 import com.google.android.gms.tasks.Task;
+import com.google.android.material.floatingactionbutton.FloatingActionButton;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.database.DataSnapshot;
 import com.google.firebase.database.DatabaseError;
@@ -132,6 +134,10 @@ public class CustomerHomeActivity extends AppCompatActivity implements OnMapRead
     private Runnable blinkRunnable;
     private boolean isVisible = true;
 
+    private FloatingActionButton emergencyBtn;
+    private DatabaseReference emergencyRequestsRef;
+
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -163,6 +169,20 @@ public class CustomerHomeActivity extends AppCompatActivity implements OnMapRead
 
         toggleCardBtn = findViewById(R.id.toggleCardBtn);
         cardContent = findViewById(R.id.cardContent);
+
+        //Emergency Response
+        // Initialize emergency references
+        emergencyRequestsRef = FirebaseDatabase.getInstance().getReference().child("emergency_requests");
+        emergencyBtn = findViewById(R.id.emergencyBtn);
+
+// Set emergency button click listener
+        emergencyBtn.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                triggerEmergencyRequest();
+            }
+        });
+
 
         // Initially hide ride details card
         rideDetailsCard.setVisibility(View.GONE);
@@ -293,6 +313,208 @@ public class CustomerHomeActivity extends AppCompatActivity implements OnMapRead
             }
         };
     }
+
+    private void triggerEmergencyRequest() {
+        // Show confirmation dialog first
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("Emergency Alert")
+                .setMessage("Are you sure you want to send an emergency alert? This will notify authorities and your emergency contacts.")
+                .setPositiveButton("YES, SEND ALERT", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        sendEmergencyRequest();
+                    }
+                })
+                .setNegativeButton("Cancel", null)
+                .setCancelable(false)
+                .show();
+    }
+
+    private void sendEmergencyRequest() {
+        if (currentRideId == null) {
+            Toast.makeText(this, "No active ride found", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        // Show progress dialog
+        ProgressDialog progressDialog = new ProgressDialog(this);
+        progressDialog.setMessage("Sending emergency alert...");
+        progressDialog.setCancelable(false);
+        progressDialog.show();
+
+        // Get current ride details
+        ridesRef.child(currentRideId).addListenerForSingleValueEvent(new ValueEventListener() {
+            @Override
+            public void onDataChange(@NonNull DataSnapshot snapshot) {
+                if (snapshot.exists()) {
+                    Ride ride = snapshot.getValue(Ride.class);
+                    if (ride != null && ride.getDriverId() != null) {
+                        // Get customer details
+                        customersRef.child(customerId).addListenerForSingleValueEvent(new ValueEventListener() {
+                            @Override
+                            public void onDataChange(@NonNull DataSnapshot customerSnapshot) {
+                                if (customerSnapshot.exists()) {
+                                    User customer = customerSnapshot.getValue(User.class);
+
+                                    // Get driver details
+                                    driversRef.child(ride.getDriverId()).addListenerForSingleValueEvent(new ValueEventListener() {
+                                        @Override
+                                        public void onDataChange(@NonNull DataSnapshot driverSnapshot) {
+                                            if (driverSnapshot.exists()) {
+                                                User driver = driverSnapshot.getValue(User.class);
+
+                                                // Get driver's current location
+                                                onlineDriversRef.child(ride.getDriverId()).addListenerForSingleValueEvent(new ValueEventListener() {
+                                                    @Override
+                                                    public void onDataChange(@NonNull DataSnapshot locationSnapshot) {
+                                                        Double driverLat = null;
+                                                        Double driverLng = null;
+
+                                                        if (locationSnapshot.exists()) {
+                                                            driverLat = locationSnapshot.child("latitude").getValue(Double.class);
+                                                            driverLng = locationSnapshot.child("longitude").getValue(Double.class);
+                                                        }
+
+                                                        // Create emergency request
+                                                        createEmergencyRequest(customer, driver, ride, driverLat, driverLng, progressDialog);
+                                                    }
+
+                                                    @Override
+                                                    public void onCancelled(@NonNull DatabaseError error) {
+                                                        createEmergencyRequest(customer, driver, ride, null, null, progressDialog);
+                                                    }
+                                                });
+                                            } else {
+                                                progressDialog.dismiss();
+                                                Toast.makeText(CustomerHomeActivity.this, "Driver details not found", Toast.LENGTH_SHORT).show();
+                                            }
+                                        }
+
+                                        @Override
+                                        public void onCancelled(@NonNull DatabaseError error) {
+                                            progressDialog.dismiss();
+                                            Toast.makeText(CustomerHomeActivity.this, "Error getting driver details", Toast.LENGTH_SHORT).show();
+                                        }
+                                    });
+                                } else {
+                                    progressDialog.dismiss();
+                                    Toast.makeText(CustomerHomeActivity.this, "Customer details not found", Toast.LENGTH_SHORT).show();
+                                }
+                            }
+
+                            @Override
+                            public void onCancelled(@NonNull DatabaseError error) {
+                                progressDialog.dismiss();
+                                Toast.makeText(CustomerHomeActivity.this, "Error getting customer details", Toast.LENGTH_SHORT).show();
+                            }
+                        });
+                    } else {
+                        progressDialog.dismiss();
+                        Toast.makeText(CustomerHomeActivity.this, "No driver assigned to this ride", Toast.LENGTH_SHORT).show();
+                    }
+                } else {
+                    progressDialog.dismiss();
+                    Toast.makeText(CustomerHomeActivity.this, "Ride details not found", Toast.LENGTH_SHORT).show();
+                }
+            }
+
+            @Override
+            public void onCancelled(@NonNull DatabaseError error) {
+                progressDialog.dismiss();
+                Toast.makeText(CustomerHomeActivity.this, "Error getting ride details", Toast.LENGTH_SHORT).show();
+            }
+        });
+    }
+
+    private void createEmergencyRequest(User customer, User driver, Ride ride, Double driverLat, Double driverLng, ProgressDialog progressDialog) {
+        String emergencyId = emergencyRequestsRef.push().getKey();
+
+        // Create emergency request object
+        Map<String, Object> emergencyRequest = new HashMap<>();
+        emergencyRequest.put("emergencyId", emergencyId);
+        emergencyRequest.put("customerId", customerId);
+        emergencyRequest.put("customerName", customer.getName());
+        emergencyRequest.put("customerPhone", customer.getPhone());
+
+        // Customer current location
+        Map<String, Object> customerLocation = new HashMap<>();
+        if (pickupLocation != null) {
+            customerLocation.put("latitude", pickupLocation.latitude);
+            customerLocation.put("longitude", pickupLocation.longitude);
+            // Get address from location
+            getAddressFromLatLng(pickupLocation, address -> {
+                customerLocation.put("address", address);
+            });
+        }
+        emergencyRequest.put("customerLocation", customerLocation);
+
+        // Driver details
+        emergencyRequest.put("driverId", ride.getDriverId());
+        emergencyRequest.put("driverName", driver.getName());
+        emergencyRequest.put("driverPhone", driver.getPhone());
+
+        // Driver location
+        if (driverLat != null && driverLng != null) {
+            Map<String, Object> driverLocation = new HashMap<>();
+            driverLocation.put("latitude", driverLat);
+            driverLocation.put("longitude", driverLng);
+            emergencyRequest.put("driverLocation", driverLocation);
+        }
+
+        // Additional details
+        emergencyRequest.put("rideId", currentRideId);
+        emergencyRequest.put("timestamp", System.currentTimeMillis());
+        emergencyRequest.put("status", "active");
+
+        // Save to Firebase
+        emergencyRequestsRef.child(emergencyId).setValue(emergencyRequest)
+                .addOnCompleteListener(task -> {
+                    progressDialog.dismiss();
+                    if (task.isSuccessful()) {
+                        Toast.makeText(CustomerHomeActivity.this,
+                                "Emergency alert sent successfully! Help is on the way.",
+                                Toast.LENGTH_LONG).show();
+
+                        // Show emergency confirmation dialog
+                        showEmergencyConfirmation(emergencyId);
+                    } else {
+                        Toast.makeText(CustomerHomeActivity.this,
+                                "Failed to send emergency alert: " + task.getException().getMessage(),
+                                Toast.LENGTH_LONG).show();
+                    }
+                });
+    }
+
+    private void getAddressFromLatLng(LatLng latLng, AddressCallback callback) {
+        Geocoder geocoder = new Geocoder(this, Locale.getDefault());
+        try {
+            List<Address> addresses = geocoder.getFromLocation(latLng.latitude, latLng.longitude, 1);
+            if (addresses != null && !addresses.isEmpty()) {
+                callback.onAddressReceived(addresses.get(0).getAddressLine(0));
+            } else {
+                callback.onAddressReceived("Address not found");
+            }
+        } catch (IOException e) {
+            callback.onAddressReceived("Unable to get address");
+        }
+    }
+
+    interface AddressCallback {
+        void onAddressReceived(String address);
+    }
+
+    private void showEmergencyConfirmation(String emergencyId) {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("Emergency Alert Sent")
+                .setMessage("Your emergency alert has been sent successfully.\n\n" +
+                        "Emergency ID: " + emergencyId + "\n\n" +
+                        "Authorities and your emergency contacts have been notified. " +
+                        "Stay calm and wait for help to arrive.")
+                .setPositiveButton("OK", null)
+                .setCancelable(false)
+                .show();
+    }
+
 
     private void startLocationUpdates() {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
