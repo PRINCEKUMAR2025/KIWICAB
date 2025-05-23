@@ -54,19 +54,6 @@
             android:textColor="@android:color/white" />
     </LinearLayout>
 
-    <com.google.android.material.floatingactionbutton.FloatingActionButton
-        android:id="@+id/emergencyBtn"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_alignParentBottom="true"
-        android:layout_alignParentEnd="true"
-        android:layout_margin="16dp"
-        android:src="@drawable/emergency_icon"
-        android:backgroundTint="#FF0000"
-        android:contentDescription="Emergency"
-        app:tint="@android:color/white" />
-
-
     <androidx.cardview.widget.CardView
         android:id="@+id/rideDetailsCard"
         android:layout_width="match_parent"
@@ -115,13 +102,37 @@
                 android:orientation="vertical"
                 android:padding="16dp">
 
-                <TextView
-                    android:id="@+id/statusTextView"
+                <!-- Status section with emergency button -->
+                <RelativeLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="Looking for a driver..."
-                    android:textSize="18sp"
-                    android:textStyle="bold" />
+                    android:layout_marginBottom="8dp">
+
+                    <TextView
+                        android:id="@+id/statusTextView"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_alignParentStart="true"
+                        android:layout_centerVertical="true"
+                        android:layout_toStartOf="@+id/emergencyBtn"
+                        android:layout_marginEnd="8dp"
+                        android:text="Looking for a driver..."
+                        android:textSize="18sp"
+                        android:textStyle="bold" />
+
+                    <com.google.android.material.floatingactionbutton.FloatingActionButton
+                        android:id="@+id/emergencyBtn"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_alignParentEnd="true"
+                        android:layout_centerVertical="true"
+                        android:src="@drawable/emergency_icon"
+                        android:backgroundTint="#FF0000"
+                        android:contentDescription="Emergency"
+                        app:fabSize="mini"
+                        app:tint="@android:color/white" />
+
+                </RelativeLayout>
 
                 <LinearLayout
                     android:id="@+id/driverDetailsLayout"
