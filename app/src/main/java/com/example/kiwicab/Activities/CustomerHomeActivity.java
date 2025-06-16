@@ -153,7 +153,7 @@ public class CustomerHomeActivity extends AppCompatActivity implements OnMapRead
         // Set up toolbar
         Toolbar toolbar = findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
-        getSupportActionBar().setTitle("AutoCab");
+        getSupportActionBar().setTitle("Rickshaw");
 
         // Initialize Firebase
         mAuth = FirebaseAuth.getInstance();
