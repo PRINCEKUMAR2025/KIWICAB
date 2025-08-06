@@ -4,15 +4,15 @@ plugins {
 }
 
 android {
-    namespace = "com.example.kiwicab"
+    namespace = "com.freeapp.kiwicab"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.example.kiwicab"
+        applicationId = "com.freeapp.kiwicab"
         minSdk = 24
-        targetSdk = 33
-        versionCode = 1
-        versionName = "1.0"
+        targetSdk = 35
+        versionCode = 5
+        versionName = "2.0.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -70,6 +70,9 @@ dependencies {
     implementation("com.google.code.gson:gson:2.9.0")
     implementation("com.google.maps.android:android-maps-utils:2.3.0")
     implementation("androidx.activity:activity:1.8.0")
+
+    implementation("com.google.android.material:material:1.11.0")
+    implementation("com.android.volley:volley:1.2.1")
 
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.2.1")

@@ -94,14 +94,18 @@
                     android:layout_marginStart="8dp" />
             </LinearLayout>
 
-            <Button
+            <com.google.android.material.button.MaterialButton
                 android:id="@+id/goOnlineBtn"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
-                android:background="@color/colorPrimary"
                 android:text="Go Online"
-                android:textColor="@android:color/white" />
+                android:textColor="@color/white"
+                app:cornerRadius="12dp"
+                app:backgroundTint="@color/colorCTA"
+                app:iconGravity="textStart"
+                app:iconPadding="8dp" />
+
         </LinearLayout>
     </LinearLayout>
 
@@ -145,6 +149,38 @@
                     android:src="@drawable/ic_arrow_up"
                     app:tint="@color/white" />
             </RelativeLayout>
+
+            <LinearLayout
+                android:id="@+id/otpVerificationLayout"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:padding="8dp"
+                android:visibility="gone">
+
+                <EditText
+                    android:id="@+id/otpEditText"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:hint="Enter OTP from customer"
+                    android:inputType="number"
+                    android:maxLength="4" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/verifyOtpBtn"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="8dp"
+                    android:text="Verify OTP"
+                    android:textColor="@color/white"
+                    app:cornerRadius="12dp"
+                    app:backgroundTint="@color/colorCTA"
+                    app:iconPadding="8dp"
+                    style="@style/UberCTAButton"/>
+
+            </LinearLayout>
+
 
             <LinearLayout
                 android:id="@+id/rideRequestContent"
@@ -193,14 +229,18 @@
                         android:text="Customer Phone"
                         android:textSize="14sp" />
 
-                    <Button
+                    <com.google.android.material.button.MaterialButton
                         android:id="@+id/callCustomerBtn"
                         android:layout_width="wrap_content"
                         android:layout_height="36dp"
-                        android:background="@drawable/rounded_button"
+                        android:layout_marginStart="8dp"
                         android:text="Call"
-                        android:textColor="@android:color/white"
-                        android:textSize="12sp" />
+                        android:textSize="12sp"
+                        android:textColor="@color/white"
+                        app:cornerRadius="18dp"
+                        app:backgroundTint="@color/colorCallButton"
+                        style="@style/UberSmallButton"/>
+
                 </LinearLayout>
 
                 <LinearLayout
@@ -258,35 +298,44 @@
                         android:textSize="14sp" />
                 </LinearLayout>
 
-                <Button
+                <com.google.android.material.button.MaterialButton
                     android:id="@+id/acceptRideBtn"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="16dp"
-                    android:background="@color/black"
                     android:text="Accept Ride"
-                    android:textColor="@android:color/white"
-                    android:visibility="gone" />
+                    android:textColor="@color/white"
+                    android:visibility="gone"
+                    app:cornerRadius="12dp"
+                    app:backgroundTint="@color/colorCTA"
+                    style="@style/UberPrimaryCTA"/>
 
-                <Button
+
+                <com.google.android.material.button.MaterialButton
                     android:id="@+id/startRideBtn"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="16dp"
-                    android:background="@color/black"
                     android:text="Start Ride"
-                    android:textColor="@android:color/white"
-                    android:visibility="gone" />
+                    android:textColor="@color/white"
+                    android:visibility="gone"
+                    app:cornerRadius="12dp"
+                    app:backgroundTint="@color/colorCTA"
+                    style="@style/UberPrimaryCTA" />
 
-                <Button
+
+                <com.google.android.material.button.MaterialButton
                     android:id="@+id/completeRideBtn"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="16dp"
-                    android:background="@color/black"
                     android:text="Complete Ride"
-                    android:textColor="@android:color/white"
-                    android:visibility="gone" />
+                    android:textColor="@color/white"
+                    android:visibility="gone"
+                    app:cornerRadius="12dp"
+                    app:backgroundTint="@color/colorCTA"
+                    style="@style/UberPrimaryCTA" />
+
             </LinearLayout>
         </LinearLayout>
     </androidx.cardview.widget.CardView>

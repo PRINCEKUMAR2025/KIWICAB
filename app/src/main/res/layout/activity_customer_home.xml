@@ -6,6 +6,7 @@
     android:layout_height="match_parent"
     tools:context=".Activities.CustomerHomeActivity">
 
+    <!-- Transparent Toolbar -->
     <androidx.appcompat.widget.Toolbar
         android:id="@+id/toolbar"
         android:layout_width="match_parent"
@@ -15,25 +16,24 @@
         android:theme="@style/ThemeOverlay.AppCompat.Dark.ActionBar"
         app:popupTheme="@style/ThemeOverlay.AppCompat.Light" />
 
+    <!-- Google Map Fragment -->
     <fragment
         android:id="@+id/map"
         android:name="com.google.android.gms.maps.SupportMapFragment"
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
 
+    <!-- Search Bar -->
     <LinearLayout
         android:id="@+id/searchLayout"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginStart="16dp"
-        android:layout_marginTop="16dp"
-        android:layout_marginEnd="16dp"
-        android:layout_marginBottom="16dp"
-        android:background="@android:color/white"
         android:layout_below="@id/toolbar"
-        android:elevation="4dp"
+        android:layout_margin="16dp"
+        android:background="@drawable/search_box_bg"
+        android:elevation="8dp"
         android:orientation="horizontal"
-        android:padding="8dp">
+        android:padding="12dp">
 
         <EditText
             android:id="@+id/destinationEditText"
@@ -42,59 +42,64 @@
             android:layout_weight="1"
             android:background="@null"
             android:hint="Where to?"
-            android:inputType="text"
+            android:textColor="@android:color/black"
+            android:textSize="16sp"
             android:padding="8dp" />
 
-        <Button
+        <com.google.android.material.button.MaterialButton
             android:id="@+id/requestRideBtn"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:background="@color/black"
             android:text="Request"
+            app:cornerRadius="12dp"
+            app:backgroundTint="@color/black"
             android:textColor="@android:color/white" />
     </LinearLayout>
 
+    <!-- Ride Details Card -->
     <androidx.cardview.widget.CardView
         android:id="@+id/rideDetailsCard"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_alignParentBottom="true"
         android:layout_margin="16dp"
-        android:elevation="8dp"
+        android:elevation="12dp"
         android:visibility="gone"
-        app:cardCornerRadius="8dp">
+        app:cardCornerRadius="16dp"
+        android:background="@android:color/white">
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical">
 
+            <!-- Header -->
             <RelativeLayout
                 android:id="@+id/cardHeader"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:background="@color/colorPrimary"
-                android:padding="8dp">
+                android:padding="12dp">
 
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_centerVertical="true"
                     android:text="Ride Details"
                     android:textColor="@android:color/white"
-                    android:textStyle="bold" />
+                    android:textStyle="bold"
+                    android:textSize="16sp" />
 
                 <ImageButton
                     android:id="@+id/toggleCardBtn"
                     android:layout_width="24dp"
                     android:layout_height="24dp"
                     android:layout_alignParentEnd="true"
-                    android:layout_centerVertical="true"
-                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:background="@drawable/circle_white_bg"
                     android:src="@drawable/ic_arrow_up"
-                    app:tint="@color/white" />
+                    app:tint="@color/colorPrimary" />
             </RelativeLayout>
 
+            <!-- Card Content -->
             <LinearLayout
                 android:id="@+id/cardContent"
                 android:layout_width="match_parent"
@@ -102,7 +107,7 @@
                 android:orientation="vertical"
                 android:padding="16dp">
 
-                <!-- Status section with emergency button -->
+                <!-- Status + Emergency -->
                 <RelativeLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
@@ -112,10 +117,6 @@
                         android:id="@+id/statusTextView"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_alignParentStart="true"
-                        android:layout_centerVertical="true"
-                        android:layout_toStartOf="@+id/emergencyBtn"
-                        android:layout_marginEnd="8dp"
                         android:text="Looking for a driver..."
                         android:textSize="18sp"
                         android:textStyle="bold" />
@@ -125,15 +126,14 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_alignParentEnd="true"
-                        android:layout_centerVertical="true"
                         android:src="@drawable/emergency_icon"
-                        android:backgroundTint="#FF0000"
                         android:contentDescription="Emergency"
+                        android:backgroundTint="#FF0000"
                         app:fabSize="mini"
                         app:tint="@android:color/white" />
-
                 </RelativeLayout>
 
+                <!-- Driver Info -->
                 <LinearLayout
                     android:id="@+id/driverDetailsLayout"
                     android:layout_width="match_parent"
@@ -168,8 +168,8 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="Vehicle Details"
-                            android:background="#FACB02"
                             android:backgroundTint="#FAD607"
+                            android:background="#FAD607"
                             android:textSize="14sp" />
 
                         <RatingBar
@@ -187,31 +187,59 @@
                         android:id="@+id/callDriverBtn"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:background="?attr/selectableItemBackgroundBorderless"
+                        android:background="@drawable/circle_white_bg"
                         android:padding="8dp"
-                        android:src="@drawable/ic_call" />
+                        android:src="@drawable/ic_call"
+                        app:tint="@color/black" />
                 </LinearLayout>
 
-                <View
-                    android:layout_width="match_parent"
-                    android:layout_height="1dp"
-                    android:layout_marginTop="16dp"
-                    android:layout_marginBottom="16dp"
-                    android:background="#E0E0E0" />
-
-                <TextView
-                    android:id="@+id/etaTextView"
+                <!-- OTP -->
+                <LinearLayout
+                    android:id="@+id/otpLayout"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="8dp"
+                    android:orientation="horizontal"
+                    android:padding="12dp"
+                    android:background="@drawable/otp_background"
+                    android:gravity="center"
+                    android:visibility="gone">
+
+                    <TextView
+                        android:id="@+id/otpTextView"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="OTP:"
+                        android:textSize="16sp"
+                        android:textColor="#1976D2"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/otpValueTextView"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:textSize="16sp"
+                        android:textColor="#1976D2"
+                        android:textStyle="bold"
+                        android:layout_marginStart="4dp" />
+                </LinearLayout>
+
+                <!-- ETA + Distance + Fare -->
+                <TextView
+                    android:id="@+id/etaTextView"
+                    android:layout_width="match_parent"
+
+                    android:layout_height="wrap_content"
                     android:text="Driver ETA: Calculating..."
                     android:textSize="16sp"
                     android:textStyle="bold"
-                    android:visibility="gone" />
+                    android:visibility="gone"
+                    android:layout_marginTop="16dp" />
 
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
                     android:orientation="horizontal">
 
                     <TextView
@@ -232,8 +260,8 @@
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:layout_marginTop="8dp">
+                    android:layout_marginTop="8dp"
+                    android:orientation="horizontal">
 
                     <TextView
                         android:layout_width="wrap_content"
@@ -250,12 +278,13 @@
                         android:textStyle="bold" />
                 </LinearLayout>
 
-                <Button
+                <com.google.android.material.button.MaterialButton
                     android:id="@+id/cancelRideBtn"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="16dp"
-                    android:background="@color/black"
+                    app:cornerRadius="12dp"
+                    app:backgroundTint="@color/black"
                     android:text="Cancel Ride"
                     android:textColor="@android:color/white" />
             </LinearLayout>
@@ -263,3 +292,4 @@
     </androidx.cardview.widget.CardView>
 
 </RelativeLayout>
+
