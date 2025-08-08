@@ -6,15 +6,6 @@
     android:layout_height="match_parent"
     tools:context=".Activities.DriverEarningsActivity">
 
-    <androidx.appcompat.widget.Toolbar
-        android:id="@+id/toolbar"
-        android:layout_width="match_parent"
-        android:layout_height="?attr/actionBarSize"
-        android:background="@color/colorPrimary"
-        android:elevation="4dp"
-        android:theme="@style/ThemeOverlay.AppCompat.Dark.ActionBar"
-        app:popupTheme="@style/ThemeOverlay.AppCompat.Light" />
-
     <androidx.cardview.widget.CardView
         android:id="@+id/balanceCard"
         android:layout_width="match_parent"
