@@ -5,21 +5,21 @@
     android:viewportWidth="960"
     android:viewportHeight="960">
 
-  <!-- White circular background -->
-  <path
-      android:fillColor="@android:color/white"
-      android:pathData="M480,0
+    <!-- White circular background -->
+    <path
+        android:fillColor="@android:color/white"
+        android:pathData="M480,0
                           A480,480 0 1,0 480,960
                           A480,480 0 1,0 480,0" />
 
-  <!-- Hamburger: three horizontal bars (black for contrast on white circle) -->
-  <path
-      android:fillColor="#000000"
-      android:pathData="M240,660h480v80h-480z" />
-  <path
-      android:fillColor="#000000"
-      android:pathData="M240,460h480v80h-480z" />
-  <path
-      android:fillColor="#000000"
-      android:pathData="M240,260h480v80h-480z" />
+    <!-- Hamburger: three horizontal bars (black for contrast on white circle) -->
+    <path
+        android:fillColor="#000000"
+        android:pathData="M240,660h480v80h-480z" />
+    <path
+        android:fillColor="#000000"
+        android:pathData="M240,460h480v80h-480z" />
+    <path
+        android:fillColor="#000000"
+        android:pathData="M240,260h480v80h-480z" />
 </vector>

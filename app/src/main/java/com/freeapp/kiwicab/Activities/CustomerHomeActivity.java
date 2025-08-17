@@ -171,6 +171,51 @@ public class CustomerHomeActivity extends AppCompatActivity implements OnMapRead
         ridesRef = FirebaseDatabase.getInstance().getReference().child("rides");
         onlineDriversRef = FirebaseDatabase.getInstance().getReference().child("online_drivers");
 
+        customersRef.child(customerId).child("currentRideId").addListenerForSingleValueEvent(new ValueEventListener() {
+            @Override
+            public void onDataChange(@NonNull DataSnapshot snapshot) {
+                if (snapshot.exists()) {
+                    String rideId = snapshot.getValue(String.class);
+                    if (rideId != null) {
+                        ridesRef.child(rideId).addListenerForSingleValueEvent(new ValueEventListener() {
+                            @Override
+                            public void onDataChange(@NonNull DataSnapshot rideSnapshot) {
+                                if (rideSnapshot.exists()) {
+                                    Ride ride = rideSnapshot.getValue(Ride.class);
+                                    if (ride != null) {
+                                        // Only update OTP UI, nothing else
+                                        String otp = ride.getOtp();
+                                        if (otp != null && !otp.isEmpty()) {
+                                            otpValueTextView.setText(otp);
+                                            otpLayout.setVisibility(View.VISIBLE);
+                                            statusTextView.setText("Your OTP: " + otp);
+                                        } else {
+                                            otpLayout.setVisibility(View.GONE);
+                                        }
+                                    }
+                                } else {
+                                    otpLayout.setVisibility(View.GONE);
+                                }
+                            }
+                            @Override
+                            public void onCancelled(@NonNull DatabaseError error) {
+                                // Log or ignore
+                            }
+                        });
+                    } else {
+                        otpLayout.setVisibility(View.GONE);
+                    }
+                } else {
+                    otpLayout.setVisibility(View.GONE);
+                }
+            }
+            @Override
+            public void onCancelled(@NonNull DatabaseError error) {
+                // Log or ignore
+            }
+        });
+
+
         // Initialize views
         SupportMapFragment mapFragment = (SupportMapFragment) getSupportFragmentManager()
                 .findFragmentById(R.id.map);
